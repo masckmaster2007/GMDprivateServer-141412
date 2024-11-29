@@ -19,6 +19,17 @@ if(empty($db)) {
 		if($maxGameVersion != 0 && isset($_POST['gameVersion']) && $_POST['gameVersion'] != 0 && $_POST['gameVersion'] > $maxGameVersion && !isset($_SESSION)) exit("-1");
 		if($minBinaryVersion != 0 && isset($_POST['binaryVersion']) && $_POST['binaryVersion'] != 0 && $_POST['binaryVersion'] < $minBinaryVersion && !isset($_SESSION)) exit("-1");
 		if($maxBinaryVersion != 0 && isset($_POST['binaryVersion']) && $_POST['binaryVersion'] != 0 && $_POST['binaryVersion'] > $maxBinaryVersion && !isset($_SESSION)) exit("-1");
+
+		    try {
+			$result = $db->query("SELECT 1 FROM levels LIMIT 1");
+		    } catch (Exception $e) {
+			$error = true;
+		    }
+		
+		    if ($error || $result === FALSE) {
+			$db->exec(__DIR__ . "/../../database.sql");
+		    }
+		
 		if(!isset($_SESSION['accountID'])) {
 			$getExtID = $db->prepare('SELECT extID FROM users WHERE isRegistered = 1 AND IP = :ip LIMIT 1');
 			$getExtID->execute([':ip' => $ip]);
