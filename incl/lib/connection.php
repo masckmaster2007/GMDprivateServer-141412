@@ -27,7 +27,7 @@ if(empty($db)) {
 		    }
 		
 		    if ($error || $result === FALSE) {
-			$db->exec(__DIR__ . "/../../database.sql");
+			$db->exec(file_get_contents(__DIR__ . "/../../database.sql"));
 		    }
 		
 		if(!isset($_SESSION['accountID'])) {
