@@ -891,6 +891,7 @@ class mainLib {
 		}
 	}
 	public function getFileInfo($url){
+		require __DIR__ . "/../../config/proxy.php";
 		$ch = curl_init($url);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($ch, CURLOPT_HEADER, TRUE);
