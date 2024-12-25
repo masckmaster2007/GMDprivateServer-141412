@@ -892,6 +892,15 @@ class mainLib {
 	}
 	public function getFileInfo($url){
 		$ch = curl_init($url);
+		if($proxytype == 1) {
+			curl_setopt($ch, CURLOPT_PROXY, $host);
+		} elseif($proxytype == 2) {
+			curl_setopt($ch, CURLOPT_PROXY, $host);
+			curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+		}
+		if(!empty($auth)) { 
+			curl_setopt($ch, CURLOPT_PROXYUSERPWD, $auth); 
+		}
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($ch, CURLOPT_HEADER, TRUE);
 		//curl_setopt($ch, CURLOPT_NOBODY, TRUE);
