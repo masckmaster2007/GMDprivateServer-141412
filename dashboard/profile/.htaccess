@@ -1,5 +1,0 @@
-RewriteEngine On
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^replies
-RewriteRule ^ %{REQUEST_URI}/../../profile/?id=%{REQUEST_URI} [L]

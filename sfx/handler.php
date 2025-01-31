@@ -1,4 +1,5 @@
 <?php
+var_dump($_GET);
 require_once "../incl/lib/connection.php";
 require_once "../incl/lib/mainLib.php";
 require "../config/dashboard.php";
