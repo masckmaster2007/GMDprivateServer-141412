@@ -1,3 +1,3 @@
 <?php
-require "../../accounts/syncGJAccount20.php";
+require "../../accounts/syncGJAccount.php";
 ?>

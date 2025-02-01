@@ -4,7 +4,7 @@ require_once "../incl/lib/mainLib.php";
 require "../config/dashboard.php";
 require "../config/proxy.php";
 $gs = new mainLib();
-$file = trim(basename($_GET['request']));
+$file = trim($_GET['request']);
 switch($file) {
 	case 'musiclibrary.dat': 
 	case 'musiclibrary_02.dat': 

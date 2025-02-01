@@ -2,6 +2,13 @@
 $unregisteredSubmissions = false; // false = green accounts can't upload levels, appear on the leaderboards etc; true = green accounts can do everything
 $preactivateAccounts = true; // false = accounts need to be activated at dashboard/login/activate.php; true = accounts can log in immediately
 
+/*
+	Debug mode
+	
+	Show errors on page if hosting supports it
+*/
+$debugMode = true;
+
 $filterUsernames = 2; // 0 = Disabled, 1 = Checks if the username is word, 2 = Checks if the username contains word
 $bannedUsernames = [ // Add words to ban if it is a username/if it is in a username
 	'RobTop',

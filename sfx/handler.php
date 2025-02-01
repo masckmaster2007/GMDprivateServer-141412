@@ -1,11 +1,10 @@
 <?php
-var_dump($_GET);
 require_once "../incl/lib/connection.php";
 require_once "../incl/lib/mainLib.php";
 require "../config/dashboard.php";
 require "../config/proxy.php";
 $gs = new mainLib();
-$file = trim(basename($_GET['request']));
+$file = trim($_GET['request']);
 switch($file) {
 	case 'sfxlibrary.dat':
 		$datFile = isset($_GET['dashboard']) ? 'standalone.dat' : 'gdps.dat';
