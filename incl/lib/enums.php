@@ -42,4 +42,10 @@ class BackupError {
 	const TooLarge = "-4";
 	const SomethingWentWrong = "-6";
 }
+
+class CommonError {
+	const Success = "1";
+	const InvalidRequest = "-1";
+	const SubmitRestoreInfo = "-9";
+}
 ?>

@@ -35,7 +35,7 @@ class Library {
 		$createAccount->execute([':userName' => $userName, ':password' => Security::hashPassword($password), ':email' => $email, ':registerDate' => time(), ':isActive' => $preactivateAccounts ? 1 : 0, ':gjp2' => Security::hashPassword($gjp2), ':salt' => $salt]);
 		
 		$accountID = $db->lastInsertId();
-		$userID = $this->createUser($userName, $accountID, $IP);
+		$userID = self::createUser($userName, $accountID, $IP);
 		
 		self::logAction($accountID, $IP, 1, $userName, $email, $userID);
 
@@ -74,7 +74,7 @@ class Library {
 		return $account;
 	}
 	
-	public function createUser($userName, $accountID, $IP) {
+	public static function createUser($userName, $accountID, $IP) {
 		require __DIR__."/connection.php";
 		
 		$isRegistered = is_numeric($accountID) ? 1 : 0;
@@ -88,10 +88,20 @@ class Library {
 	
 	public static function getUserID($accountID) {
 		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
 		
 		$userID = $db->prepare("SELECT userID FROM users WHERE extID = :extID");
 		$userID->execute([':extID' => $accountID]);
 		$userID = $userID->fetchColumn();
+		
+		if(!$userID) {
+			$account = self::getAccountByID($accountID);
+			if(!$account) return false;
+			
+			$IP = IP::getIP();
+			$userName = $account['userName'];
+			$userID = self::createUser($userName, $accountID, $IP);
+		}
 		
 		return $userID;
 	}
@@ -114,6 +124,79 @@ class Library {
 		$accountID = $accountID->fetchColumn();
 		
 		return $accountID;
+	}
+	
+	public static function getUserByID($userID) {
+		require __DIR__."/connection.php";
+		
+		$user = $db->prepare("SELECT * FROM users WHERE userID = :userID");
+		$user->execute([':userID' => $userID]);
+		$user = $user->fetch();
+		
+		return $user;
+	}
+	
+	public static function getFriendRequest($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+		
+		$friendRequest = $db->prepare("SELECT * FROM friendreqs WHERE accountID = :accountID AND toAccountID = :targetAccountID");
+		$friendRequest->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		$friendRequest = $friendRequest->fetch();
+		
+		return $friendRequest;
+	}
+	
+	public static function isFriends($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+
+		$isFriends = $db->prepare("SELECT count(*) FROM friendships WHERE (person1 = :accountID AND person2 = :targetAccountID) OR (person1 = :targetAccountID AND person2 = :accountID)");
+		$isFriends->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		return $isFriends->fetchColumn() > 0;
+	}
+	
+	public static function getAccountComments($userID, $commentsPage) {
+		require __DIR__."/connection.php";
+
+		$accountComments = $db->prepare("SELECT * FROM acccomments WHERE userID = :userID ORDER BY timestamp DESC LIMIT 10 OFFSET ".$commentsPage);
+		$accountComments->execute([':userID' => $userID]);
+		$accountComments = $accountComments->fetchAll();
+		
+		$accountCommentsCount = $db->prepare("SELECT count(*) FROM acccomments WHERE userID = :userID");
+		$accountCommentsCount->execute([':userID' => $userID]);
+		$accountCommentsCount = $accountCommentsCount->fetchColumn();
+		
+		return ["comments" => $accountComments, "count" => $accountCommentsCount];
+	}
+	
+	public static function uploadAccountComment($accountID, $userID, $userName, $comment) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		$comment = Escape::url_base64_encode($comment);
+		
+		$uploadAccountComment = $db->prepare("INSERT INTO acccomments (userID, comment, timestamp)
+			VALUES (:userID, :comment, :timestamp)");
+		$uploadAccountComment->execute([':userID' => $userID, ':comment' => $comment, ':timestamp' => time()]);
+		$commentID = $db->lastInsertId();
+
+		self::logAction($accountID, $IP, 14, $userName, $comment, $commentID);
+		
+		return $commentID;
+	}
+	
+	public static function updateAccountSettings($accountID, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$updateAccountSettings = $db->prepare("UPDATE accounts SET mS = :messagesState, frS = :friendRequestsState, cS = :commentsState, youtubeurl = :socialsYouTube, twitter = :socialsTwitter, twitch = :socialsTwitch WHERE accountID = :accountID");
+		$updateAccountSettings->execute([':accountID' => $accountID, ':messagesState' => $messagesState, ':friendRequestsState' => $friendRequestsState, ':commentsState' => $commentsState, ':socialsYouTube' => $socialsYouTube, ':socialsTwitter' => $socialsTwitter, ':socialsTwitch' => $socialsTwitch]);
+		
+		self::logAction($accountID, $IP, 27, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch);
 	}
 	
 	/*
@@ -142,6 +225,32 @@ class Library {
 		}
 		$randomString = bin2hex($randomString);
 		return $randomString;
+	}
+	
+	public static function makeTime($time) {
+		require __DIR__ . "/../../config/dashboard.php";
+		if(!isset($timeType)) $timeType = 0;
+		switch($timeType) {
+			case 1:
+				if(date("d.m.Y", $time) == date("d.m.Y", time())) return date("G;i", $time);
+				elseif(date("Y", $time) == date("Y", time())) return date("d.m", $time);
+				else return date("d.m.Y", $time);
+				break;
+			case 2:
+				// taken from https://stackoverflow.com/a/36297417
+				$time = time() - $time;
+				$time = ($time < 1) ? 1 : $time;
+				$tokens = array (31536000 => 'year', 2592000 => 'month', 604800 => 'week', 86400 => 'day', 3600 => 'hour', 60 => 'minute', 1 => 'second');
+				foreach($tokens as $unit => $text) {
+					if($time < $unit) continue;
+					$numberOfUnits = floor($time / $unit);
+					return $numberOfUnits . ' ' . $text . (($numberOfUnits > 1) ? 's' : '');
+				}
+				break;
+			default:
+				return date("d/m/Y G.i", $time);
+				break;
+		}
 	}
 }
 ?>

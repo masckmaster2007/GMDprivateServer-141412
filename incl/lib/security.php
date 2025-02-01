@@ -13,20 +13,20 @@ class Security {
 		require_once __DIR__."/enums.php";
 		
 		$account = Library::getAccountByID($accountID);
-		if(!$account) return ["success" => false, "error" => LoginError::WrongCredentials];
+		if(!$account) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
 		
 		switch($type) {
 			case 1:
-				if(!password_verify($key, $account["password"])) return ["success" => false, "error" => LoginError::WrongCredentials];
+				if(!password_verify($key, $account["password"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
 				break;
 			case 2:
-				if(!password_verify($key, $account["gjp2"])) return ["success" => false, "error" => LoginError::WrongCredentials];
+				if(!password_verify($key, $account["gjp2"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
 				break;
 			case 3:
-				if(empty(trim($key)) || $key != $account["auth"]) return ["success" => false, "error" => LoginError::WrongCredentials];
+				if(empty(trim($key)) || $key != $account["auth"]) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
 				break;
 		}		
-		if($account["isActive"] == "0") return ["success" => false, "error" => LoginError::AccountIsNotActivated];
+		if($account["isActive"] == "0") return ["success" => false, "error" => LoginError::AccountIsNotActivated, "accountID" => (string)$accountID];
 		
 		$userID = Library::getUserID($accountID);
 		
@@ -36,7 +36,11 @@ class Security {
 			if(file_exists(__DIR__.'/../../data/accounts/'.$accountID)) $this->encryptFile(__DIR__.'/../../data/accounts/'.$accountID, $salt);
 		}
 		
-		return ["success" => true, "accountID" => $accountID, "userID" => $userID];
+		$userName = $account["userName"];
+		
+		self::updateLastPlayed($userID);
+		
+		return ["success" => true, "accountID" => (string)$accountID, "userID" => (string)$userID, "userName" => (string)$userName];
 	}
 	
 	public function loginToAccountWithUserName($userName, $key, $type) {
@@ -44,7 +48,7 @@ class Security {
 		require_once __DIR__."/enums.php";
 		
 		$accountID = Library::getAccountIDWithUserName($userName);
-		if(!$accountID) return ["success" => false, "error" => LoginError::WrongCredentials];
+		if(!$accountID) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => "0"];
 		
 		return $this->loginToAccountWithID($accountID, $key, $type);
 	}
@@ -105,6 +109,34 @@ class Security {
 				return false;
 		}
 		return ["key" => $key, "type" => $type];
+	}
+	
+	public function loginPlayer() {
+		require_once __DIR__."/mainLib.php";
+		require_once __DIR__."/exploitPatch.php";
+		require_once __DIR__."/enums.php";
+		if(isset($_POST['userName'])) {
+			$userName = Escape::latin($_POST['userName']);
+			$accountID = Library::getAccountIDWithUserName($userName);
+		} else {
+			$accountID = Escape::number($_POST['accountID']);
+		}
+		$loginType = self::getLoginType();
+
+		if(!$loginType) return ["success" => false, "error" => LoginError::GenericError, "accountID" => $accountID];
+
+		$loginToAccount = $this->loginToAccountWithID($accountID, $loginType["key"], $loginType["type"]);
+		if(!$loginToAccount['success']) return ["success" => false, "error" => $loginToAccount['error'], "accountID" => $accountID];
+		return ["success" => true, "accountID" => $loginToAccount['accountID'], "userID" => $loginToAccount['userID'], "userName" => $loginToAccount["userName"]];
+	}
+	
+	public static function updateLastPlayed($userID) {
+		require_once __DIR__."/connection.php";
+
+		if(!isset($db)) global $db;
+		
+		$updateLastPlayed = $db->prepare("UPDATE users SET lastPlayed = :lastPlayed WHERE userID = :userID");
+		return $updateLastPlayed->execute([':lastPlayed' => time(), ':userID' => $userID]);
 	}
 }
 ?>

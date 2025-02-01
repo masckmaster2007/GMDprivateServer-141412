@@ -7,13 +7,9 @@ require_once __DIR__."/../incl/lib/ip.php";
 $sec = new Security();
 
 $IP = IP::getIP();
-$accountID = Escape::number($_POST['accountID']);
-$loginType = Security::getLoginType();
-
-if(!$loginType) exit(LoginError::GenericError);
-
-$loginToAccount = $sec->loginToAccountWithID($accountID, $loginType["key"], $loginType["type"]);
-if(!$loginToAccount['success']) exit(BackupError::WrongCredentials);
+$player = $sec->loginPlayer();
+if(!$player["success"]) exit(CommonError::InvalidRequest);
+$accountID = $player["accountID"];
 
 $account = Library::getAccountByID($accountID);
 
