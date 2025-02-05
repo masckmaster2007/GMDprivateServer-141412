@@ -1,16 +1,52 @@
 <?php
-$unregisteredSubmissions = false; // false = green accounts can't upload levels, appear on the leaderboards etc; true = green accounts can do everything
-$preactivateAccounts = true; // false = accounts need to be activated at dashboard/login/activate.php; true = accounts can log in immediately
+/*
+	Submissions by unregistered accounts
+	
+	Should unregistered accounts be able to upload levels, post comments, etc. Required for <1.9 GDPSs:
+		True — unregistered accounts can do everything
+		False — only registered accounts can interact with GDPS
+*/
+$unregisteredSubmissions = false;
+
+/*
+	Preactivate accounts
+	
+	Should new accounts already be registered:
+		True — all new accounts are automatically registered
+		False — new accounts must be activated through activate page (dashboard/login/activate.php) or email message
+*/
+$preactivateAccounts = true;
 
 /*
 	Debug mode
-	
+
 	Show errors on page if hosting supports it
 */
 $debugMode = true;
 
-$filterUsernames = 2; // 0 = Disabled, 1 = Checks if the username is word, 2 = Checks if the username contains word
-$bannedUsernames = [ // Add words to ban if it is a username/if it is in a username
+/*
+	Filters for various places
+	
+	$filterUsernames — method of filtering usernames:
+		0 — disabled
+		1 — checks if username is the word
+		2 — checks if username contains the word
+	$bannedUsernames — list of banned words in usernames
+	
+	$filterClanNames — method of filtering clan names:
+		0 — disabled
+		1 — checks if clan name is the word
+		2 — checks if clan name contains the word
+	$bannedClanNames — list of banned words in clan names
+	
+	$filterClanTags — method of filtering clan tags:
+		0 — disabled
+		1 — checks if clan tag is the word
+		2 — checks if clan tag contains the word
+	$bannedClanTags — list of banned words in clan tags
+*/
+$filterUsernames = 2;
+$bannedClanTags = [ // Add words to ban if it is a username/if it is in a username
 	'RobTop',
 	'nig',
 	'fag'
@@ -35,21 +71,29 @@ $bannedClanTags = [ // Add words to ban if it is a clan tag/if it is in a clan t
 
 /*
 	Captcha settings
-	Supports: hCaptcha, reCaptcha, Cloudflare Turnstile (why not!)
-	hCaptcha: https://www.hcaptcha.com/
-	reCaptcha: https://www.google.com/recaptcha/
-	Cloudflare Turnstile: https://www.cloudflare.com/products/turnstile/
+	
+	$enableCaptcha — should captcha be enabled:
+		True — captcha is enabled, you must configure next three variables
+		False — captcha is disabled
+	$captchaType — captcha provider:
+		1  — hCaptcha: https://www.hcaptcha.com/
+		2 — reCaptcha: https://www.google.com/recaptcha/
+		3 — Cloudflare Turnstile: https://www.cloudflare.com/products/turnstile/
+	$CaptchaKey — public captcha key
+	$CaptchaSecret — private captcha key, must not be shared with anyone
 */
 
 $enableCaptcha = false;
-$captchaType = 1; // 1 for hCaptcha, 2 for reCaptcha and 3 for CF-Turnstile
+$captchaType = 1;
 $CaptchaKey = "";
 $CaptchaSecret = "";
 
 /*
 	Block access from free proxies and common VPNs
+
 	Below are URLs for proxies and VPSs
 	Should only return list of IPs without any other HTML code
+
 	Syntax: $proxies['NAME OF IPs'] = 'LINK';
 */
 
@@ -72,13 +116,16 @@ $vpns['vpn'] = 'https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/v
 	$levelsCountModifier — modifier to yesterday levels count to avoid small levels increase warning
 		if(Levels today > Levels yesterday * Levels modifier) WARNING;
 	$levelsCheckPeriod — what period of time in seconds to check
-	
+
 	$accountsCountModifier — modifier to yesterday accounts count to avoid small accounts increase warning
 		if(Accounts today > Accounts yesterday * Accounts modifier) WARNING;
 	$accountsCheckPeriod — what period of time in seconds to check
-	
+
 	$commentsCheckPeriod — comments posted in this period of time in seconds will be checked
 		600 is 10 minutes, so comments posted in last 10 minutes would be checked
+
+	$globalLevelsUploadDelay — if last level was uploaded X seconds ago, new one can't be uploaded.
+	$perUserLevelsUploadDelay — if last level by some user was uploaded X seconds ago, new one can't be uploaded.
 */
 
 $warningsPeriod = 86400;
@@ -90,4 +137,7 @@ $accountsCountModifier = 1.3;
 $accountsCheckPeriod = 86400;
 
 $commentsCheckPeriod = 600;
+
+$globalLevelsUploadDelay = 2;
+$perUserLevelsUploadDelay = 5;
 ?>

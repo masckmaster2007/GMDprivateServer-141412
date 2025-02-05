@@ -93,13 +93,13 @@ class Security {
 	
 	public static function getLoginType() {
 		switch(true) {
-			case isset($_POST['password']):
-				$key = $_POST['password'];
-				$type = 1;
-				break;
 			case isset($_POST['gjp2']):
 				$key = $_POST['gjp2'];
 				$type = 2;
+				break;
+			case isset($_POST['password']):
+				$key = $_POST['password'];
+				$type = 1;
 				break;
 			case isset($_POST['auth']):
 				$key = $_POST['auth'];
@@ -137,6 +137,28 @@ class Security {
 		
 		$updateLastPlayed = $db->prepare("UPDATE users SET lastPlayed = :lastPlayed WHERE userID = :userID");
 		return $updateLastPlayed->execute([':lastPlayed' => time(), ':userID' => $userID]);
+	}
+	
+	public static function generateLevelsHash($levelsStatsArray) {
+		$hash = "";
+		foreach($levelsStatsArray as $level) {
+			$id = strval($level['levelID']);
+			$hash = $hash.$id[0].$id[strlen($id)-1].$level["stars"].$level["coins"];
+		}
+		return sha1($hash."xI25fpAapCQg");
+	}
+	
+	public static function generateFirstHash($levelString) {
+		$len = strlen($levelString);
+		if($len < 41) return sha1($levelString."xI25fpAapCQg");
+		$hash = '????????????????????????????????????????xI25fpAapCQg';
+		$m = intdiv($len, 40);
+		$i = 40;
+		while($i)$hash[--$i] = $levelString[$i*$m];
+		return sha1($hash);
+	}
+	public static function generateSecondHash($levelString) {
+		return sha1($levelString."xI25fpAapCQg");
 	}
 }
 ?>

@@ -284,7 +284,7 @@ if(!$installed) {
 		if(!empty($exist)) {
 			$check = $db->query("SHOW COLUMNS FROM `vaultcodes` LIKE 'rewards'");
 				$exist = $check->fetchAll();
-				if(empty($exist)) $db->query("ALTER TABLE `vaultcodes` ADD `rewards` varchar(2048) NOT NULL DEFAULT '0' AFTER `duration`");
+				if(empty($exist)) $db->query("ALTER TABLE `vaultcodes` ADD `rewards` varchar(2048) NOT NULL DEFAULT '' AFTER `duration`");
 			$db->query("UPDATE vaultcodes SET rewards = CONCAT(type,  \",\", reward)");
 			$check = $db->query("SHOW COLUMNS FROM `vaultcodes` LIKE 'type'");
 				$exist = $check->fetchAll();
@@ -318,6 +318,24 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `acccomments` LIKE 'dislikes'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `acccomments` ADD `dislikes` INT NOT NULL DEFAULT '0' AFTER `likes`");
+	$check = $db->query("SHOW COLUMNS FROM `comments` LIKE 'dislikes'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `comments` ADD `dislikes` INT NOT NULL DEFAULT '0' AFTER `likes`");
+	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'dislikes'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `levels` ADD `dislikes` INT NOT NULL DEFAULT '0' AFTER `likes`");
+	$check = $db->query("SHOW COLUMNS FROM `lists` LIKE 'dislikes'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `lists` ADD `dislikes` INT NOT NULL DEFAULT '0' AFTER `likes`");
+	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'difficultyDenominator'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `levels` ADD `difficultyDenominator` INT NOT NULL DEFAULT '0' AFTER `starDifficulty`");
+	$check = $db->query("SHOW COLUMNS FROM `actions_downloads` LIKE 'accountID'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `actions_downloads` ADD `accountID` varchar(255) NOT NULL DEFAULT '' AFTER `ip`");
+	$check = $db->query("SHOW COLUMNS FROM `actions_likes` LIKE 'accountID'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `actions_likes` ADD `accountID` varchar(255) NOT NULL DEFAULT '' AFTER `ip`");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

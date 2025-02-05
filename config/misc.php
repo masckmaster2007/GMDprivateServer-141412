@@ -104,7 +104,7 @@ $maxBinaryVersion = 0;
 	False - Only show levels your GD version support
 */
 
-$showAllLevels = false;
+$showAllLevels = true;
 
 /*
 	Amount of stars for leaderboards

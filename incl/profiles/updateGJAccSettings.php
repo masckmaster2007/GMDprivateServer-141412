@@ -6,7 +6,6 @@ require_once __DIR__."/../lib/enums.php";
 require_once __DIR__."/../lib/ip.php";
 $sec = new Security();
 
-$IP = IP::getIP();
 $messagesState = Escape::number($_POST["mS"]);
 $friendRequestsState = Escape::number($_POST["frS"]);
 $commentsState = Escape::number($_POST["cS"]);
@@ -16,6 +15,7 @@ $socialsTwitch = Escape::text($_POST["twitch"]);
 
 $player = $sec->loginPlayer();
 if(!$player["success"]) exit(CommonError::InvalidRequest);
+$IP = IP::getIP();
 $accountID = $player["accountID"];
 $userID = $player["userID"];
 $userName = $player["userName"];

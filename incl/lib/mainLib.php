@@ -199,6 +199,307 @@ class Library {
 		self::logAction($accountID, $IP, 27, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch);
 	}
 	
+	public static function getFriends($accountID) {
+		require __DIR__."/connection.php";
+		
+		$friendsArray = [];
+		
+		$getFriends = $db->prepare("SELECT person1, person2 FROM friendships WHERE person1 = :accountID OR person2 = :accountID");
+		$getFriends->execute([':accountID' => $accountID]);
+		$getFriends = $getFriends->fetchAll();
+		
+		foreach($getFriends as &$friendship) $friendsArray[] = $friendship["person2"] == $accountID ? $friendship["person1"] : $friendship["person2"];
+		
+		return $friendsArray;
+	}
+	
+	public static function getUserString($user) {
+		//$userdata['userName'] = $this->makeClanUsername($user);
+		return $user['userID'].':'.$user["userName"].':'.(is_numeric($user['extID']) ? $user['extID'] : 0);
+	}
+	
+	public static function isAccountAdmininstrator($accountID) {
+		$account = self::getAccountByID($accountID);
+		return $account['isAdmin'] != 0;
+	}
+	
+	/*
+		Levels-related functions
+	*/
+	
+	public static function escapeDescriptionCrash($rawDesc) {
+		if(strpos($rawDesc, '<c') !== false) {
+			$tagsStart = substr_count($rawDesc, '<c');
+			$tagsEnd = substr_count($rawDesc, '</c>');
+			if($tagsStart > $tagsEnd) {
+				$tags = $tagsStart - $tagsEnd;
+				for($i = 0; $i < $tags; $i++) $rawDesc .= '</c>';
+			}
+		}
+		return $rawDesc;
+	}
+	
+	public static function isAbleToUploadLevel($accountID, $userID, $IP) {
+		require __DIR__."/connection.php";
+		require __DIR__."/../../config/security.php";
+		
+		$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time');
+		$lastUploadedLevel->execute([':time' => time() - $globalLevelsUploadDelay]);
+		$lastUploadedLevel = $lastUploadedLevel->fetchColumn();
+		if($lastUploadedLevel) return ["success" => false, "error" => LevelUploadError::TooFast];
+		
+		$lastUploadedLevelByUser = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND (userID = :userID OR hostname = :IP)');
+		$lastUploadedLevelByUser->execute([':time' => time() - $perUserLevelsUploadDelay, ':userID' => $userID, ':IP' => $IP]);
+		$lastUploadedLevelByUser = $lastUploadedLevelByUser->fetchColumn();
+		if($lastUploadedLevelByUser) return ["success" => false, "error" => LevelUploadError::TooFast];
+		
+		return ["success" => true];
+	}
+	
+	public function uploadLevel($accountID, $userID, $levelID, $levelName, $levelString, $levelDetails) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$checkLevelExistenceByID = $db->prepare("SELECT count(*) FROM levels WHERE levelID = :levelID AND userID = :userID");
+		$checkLevelExistenceByID->execute([':levelID' => $levelID, ':userID' => $userID]);
+		$checkLevelExistenceByID = $checkLevelExistenceByID->fetchColumn();
+		if($checkLevelExistenceByID) {
+			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$levelID, $levelString);
+			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
+			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
+			$updateLevel->execute([':levelID' => $levelID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			self::logAction($accountID, $IP, 23, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+			return ["success" => true, "levelID" => (string)$levelID];
+		}
+		
+		$checkLevelExistenceByName = $db->prepare("SELECT levelID FROM levels WHERE levelName LIKE :levelName AND userID = :userID ORDER BY levelID DESC LIMIT 1");
+		$checkLevelExistenceByName->execute([':levelName' => $levelName, ':userID' => $userID]);
+		$checkLevelExistenceByName = $checkLevelExistenceByName->fetchColumn();
+		if($checkLevelExistenceByName) {
+			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$checkLevelExistenceByName, $levelString);
+			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
+			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
+			$updateLevel->execute([':levelID' => $checkLevelExistenceByName, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			self::logAction($accountID, $IP, 23, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+			return ["success" => true, "levelID" => (string)$checkLevelExistenceByName];
+		}
+		
+		$timestamp = time();
+		$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, $levelString);
+		if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
+		$uploadLevel = $db->prepare("INSERT INTO levels (userID, extID, userName, gameVersion, binaryVersion, levelName, levelDesc, levelVersion, levelLength, audioTrack, auto, original, twoPlayer, songID, objects, coins, requestedStars, extraString, levelString, levelInfo, unlisted, unlisted2, hostname, isLDM, wt, wt2, settingsString, songIDs, sfxIDs, ts, password, uploadDate, updateDate)
+			VALUES (:userID, :accountID, :userName, :gameVersion, :binaryVersion, :levelName, :levelDesc, :levelVersion, :levelLength, :audioTrack, :auto, :original, :twoPlayer, :songID, :objects, :coins, :requestedStars, :extraString, '', :levelInfo, :unlisted, :unlisted, :IP, :isLDM, :wt, :wt2, :settingsString, :songIDs, :sfxIDs, :ts, :password, :timestamp, 0)");
+		$uploadLevel->execute([':userID' => $userID, ':accountID' => $accountID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelName' => $levelName, ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => $timestamp, ':IP' => $IP]);
+		$levelID = $db->lastInsertId();
+		rename(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, __DIR__.'/../../data/levels/'.$levelID);
+		self::logAction($accountID, $IP, 22, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+		return ["success" => true, "levelID" => (string)$levelID];
+	}
+	
+	public static function getLevels($filters, $order, $orderSorting, $queryJoin, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(" ) AND ( ", $filters).") ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
+		$levels->execute();
+		$levels = $levels->fetchAll();
+		
+		$levelsCount = $db->prepare("SELECT count(*) FROM levels ".$queryJoin." WHERE (".implode(" ) AND ( ", $filters).")");
+		$levelsCount->execute();
+		$levelsCount = $levelsCount->fetchColumn();
+		
+		return ["levels" => $levels, "count" => $levelsCount];
+	}
+	
+	public static function getGauntletByID($gauntletID) {
+		require __DIR__."/connection.php";
+		
+		$gauntlet = $db->prepare("SELECT * FROM gauntlets WHERE ID = :gauntletID");
+		$gauntlet->execute([':gauntletID' => $gauntletID]);
+		$gauntlet = $gauntlet->fetch();
+		
+		return $gauntlet;
+	}
+	
+	public static function canAccountPlayLevel($accountID, $level) {
+		require __DIR__."/../../config/misc.php";
+		
+		if($unlistedLevelsForAdmins && self::isAccountAdmininstrator($accountID)) return true;
+		
+		return !($level['unlisted'] > 0 && ($level['unlisted'] == 1 && (self::isFriends($accountID, $level['extID']) || $accountID == $level['extID'])));
+	}
+	
+	public static function getDailyLevelID($type) {
+		require __DIR__."/connection.php";
+		
+		switch($type) {
+			case -1: // Daily level
+				$dailyLevelID = $db->prepare("SELECT feaID, levelID FROM dailyfeatures WHERE timestamp < :time AND type = 0 ORDER BY timestamp DESC LIMIT 1");
+				$dailyLevelID->execute([':time' => time()]);
+				$dailyLevelID = $dailyLevelID->fetch();
+				$levelID = $dailyLevelID["levelID"];
+				$feaID = $dailyLevelID["feaID"];
+				break;
+			case -2: // Weekly level
+				$weeklyLevelID = $db->prepare("SELECT feaID, levelID FROM dailyfeatures WHERE timestamp < :time AND type = 1 ORDER BY timestamp DESC LIMIT 1");
+				$weeklyLevelID->execute([':time' => time()]);
+				$weeklyLevelID = $weeklyLevelID->fetch();
+				$levelID = $weeklyLevelID["levelID"];
+				$feaID = $weeklyLevelID["feaID"] + 100000;
+				break;
+			case -3: // Event level
+				$eventLevelID = $db->prepare("SELECT feaID, levelID FROM events WHERE timestamp < :time AND duration >= :time ORDER BY timestamp DESC LIMIT 1");
+				$eventLevelID->execute([':time' => time()]);
+				$eventLevelID = $eventLevelID->fetch();
+				$levelID = $eventLevelID["levelID"];
+				$feaID = $eventLevelID["feaID"] + 200000;
+				break;
+		}
+		
+		if(!$levelID) return false;
+		
+		return ["levelID" => $levelID, "feaID" => $feaID];
+	}
+	
+	public static function getLevelByID($levelID) {
+		require __DIR__."/connection.php";
+		
+		$level = $db->prepare('SELECT * FROM levels WHERE levelID = :levelID');
+		$level->execute([':levelID' => $levelID]);
+		$level = $level->fetch();
+		
+		return $level;
+	}
+	
+	public static function addDownloadToLevel($accountID, $IP, $levelID) {
+		require __DIR__."/connection.php";
+		
+		$getDownloads = $db->prepare("SELECT count(*) FROM actions_downloads WHERE levelID = :levelID AND (ip = INET6_ATON(:IP) OR accountID = :accountID)");
+		$getDownloads->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
+		if($getDownloads->fetchColumn() == 0) {
+			$query2 = $db->prepare("UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID");
+			$query2->execute([':levelID' => $levelID]);
+			$query6 = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID) VALUES (:levelID, INET6_ATON(:IP), :accountID)");
+			$query6->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
+		}
+	}
+	
+	/*
+		Lists-related functions
+	*/
+	
+	public static function getListLevels($listID) {
+		require __DIR__."/connection.php";
+		
+		$listLevels = $db->prepare('SELECT listlevels FROM lists WHERE listID = :listID');
+		$listLevels->execute([':listID' => $listID]);
+		$listLevels = $listLevels->fetchColumn();
+		
+		return $listLevels;
+	}
+	
+	/*
+		Audio-related functions
+	*/
+	
+	public static function getSongByID($songID, $column = "*", $library = false) {
+		require __DIR__."/connection.php";
+		
+		$isLocalSong = true;
+		
+		$song = $db->prepare("SELECT $column FROM songs WHERE ID = :songID");
+		$song->execute([':songID' => $songID]);
+		$song = $song->fetch();
+		
+		if(empty($song)) {
+			$song = self::getLibrarySongInfo($songID, 'music', $library);
+			if(!$song) return false;
+			$isLocalSong = false;
+		}
+		
+		if($column != "*") return $song[$column];
+		else return array("isLocalSong" => $isLocalSong, "ID" => $song["ID"], "name" => $song["name"], "authorName" => $song["authorName"], "size" => $song["size"], "duration" => $song["duration"], "download" => $song["download"], "reuploadTime" => $song["reuploadTime"], "reuploadID" => $song["reuploadID"]);
+	}
+	
+	public static function getSFXByID($sfxID, $column = "*") {
+		require __DIR__."/connection.php";
+		
+		$sfx = $db->prepare("SELECT $column FROM sfxs WHERE ID = :sfxID");
+		$sfx->execute([':sfxID' => $sfxID]);
+		$sfx = $sfx->fetch();
+		if(empty($sfx)) return false;
+		
+		if($column != "*") return $sfx[$column];
+		else return array("ID" => $sfx["ID"], "name" => $sfx["name"], "authorName" => $sfx["authorName"], "size" => $sfx["size"], "download" => $sfx["download"], "reuploadTime" => $sfx["reuploadTime"], "reuploadID" => $sfx["reuploadID"]);
+	}
+	
+	public static function getSongString($songID) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		$librarySong = false;
+		$extraSongString = '';
+		$song = self::getSongByID($songID);
+		if(!$song) {
+			$librarySong = true;
+			$song = self::getLibrarySongInfo($song['songID']);
+		}
+		if(!$song || empty($song['ID']) || $song["isDisabled"] == 1) return false;
+		$downloadLink = urlencode($song["download"]);
+		if($librarySong) {
+			$artistsNames = [];
+			$artistsArray = explode('.', $song['artists']);
+			if(count($artistsArray) > 0) {
+				foreach($artistsArray AS &$artistID) {
+					$artistData = self::getLibrarySongAuthorInfo($artistID);
+					if(!$artistData) continue;
+					$artistsNames[] = $artistID.','.$artistData['name'];
+				}
+			}
+			$artistsNames = implode(',', $artistsNames);
+			$extraSongString = '~|~9~|~'.$song['priorityOrder'].'~|~11~|~'.$song['ncs'].'~|~12~|~'.$song['artists'].'~|~13~|~'.($song['new'] ? 1 : 0).'~|~14~|~'.$song['new'].'~|~15~|~'.$artistsNames;
+		}
+		return "1~|~".$song["ID"]."~|~2~|~".Escape::translit(str_replace("#", "", $song["name"]))."~|~3~|~".$song["authorID"]."~|~4~|~".Escape::translit($song["authorName"])."~|~5~|~".$song["size"]."~|~6~|~~|~10~|~".$downloadLink."~|~7~|~~|~8~|~1".$extraSongString;
+	}
+	
+	public static function getLibrarySongInfo($audioID, $type = 'music', $extraLibrary = false) {
+		require __DIR__."/../../config/dashboard.php";
+		if(!file_exists(__DIR__.'/../../'.$type.'/ids.json')) return false;
+		$servers = $serverIDs = $serverNames = [];
+		foreach($customLibrary AS $customLib) {
+			$servers[$customLib[0]] = $customLib[2];
+			$serverNames[$customLib[0]] = $customLib[1];
+			$serverIDs[$customLib[2]] = $customLib[0];
+		}
+		
+		$library = $extraLibrary ? $extraLibrary : json_decode(file_get_contents(__DIR__.'/../../'.$type.'/ids.json'), true);
+		if(!isset($library['IDs'][$audioID]) || ($type == 'music' && $library['IDs'][$audioID]['type'] != 1)) return false;
+		
+		if($type == 'music') {
+			$song = $library['IDs'][$audioID];
+			$author = $library['IDs'][$song['authorID']];
+			$token =self::randomString(22);
+			$expires = time() + 3600;
+			$link = $servers[$song['server']].'/music/'.$song['originalID'].'.ogg?token='.$token.'&expires='.$expires;
+			return ['server' => $song['server'], 'ID' => $audioID, 'name' => $song['name'], 'authorID' => $song['authorID'], 'authorName' => $author['name'], 'size' => round($song['size'] / 1024 / 1024, 2), 'download' => $link, 'seconds' => $song['seconds'], 'tags' => $song['tags'], 'ncs' => $song['ncs'], 'artists' => $song['artists'], 'externalLink' => $song['externalLink'], 'new' => $song['new'], 'priorityOrder' => $song['priorityOrder']];
+		} else {
+			$SFX = $library['IDs'][$audioID];
+			$token = self::randomString(22);
+			$expires = time() + 3600;
+			$link = $servers[$SFX['server']] != null ? $servers[$SFX['server']].'/sfx/s'.$SFX['ID'].'.ogg?token='.$token.'&expires='.$expires : self::getSFXByID($SFX['ID'], 'download');
+			return ['isLocalSFX' => $servers[$SFX['server']] == null, 'server' => $SFX['server'], 'ID' => $audioID, 'name' => $song['name'], 'download' => $link, 'originalID' => $SFX['ID']];
+		}
+	}
+	
+	public static function getLibrarySongAuthorInfo($songID) {
+		if(!file_exists(__DIR__.'/../../music/ids.json')) return false;
+		
+		$library = json_decode(file_get_contents(__DIR__.'/../../music/ids.json'), true);
+		if(!isset($library['IDs'][$songID])) return false;
+		
+		return $library['IDs'][$songID];
+	}
+	
 	/*
 		Utils
 	*/
@@ -228,7 +529,7 @@ class Library {
 	}
 	
 	public static function makeTime($time) {
-		require __DIR__ . "/../../config/dashboard.php";
+		require __DIR__."/../../config/dashboard.php";
 		if(!isset($timeType)) $timeType = 0;
 		switch($timeType) {
 			case 1:
@@ -244,7 +545,7 @@ class Library {
 				foreach($tokens as $unit => $text) {
 					if($time < $unit) continue;
 					$numberOfUnits = floor($time / $unit);
-					return $numberOfUnits . ' ' . $text . (($numberOfUnits > 1) ? 's' : '');
+					return $numberOfUnits.' '.$text.(($numberOfUnits > 1) ? 's' : '');
 				}
 				break;
 			default:
