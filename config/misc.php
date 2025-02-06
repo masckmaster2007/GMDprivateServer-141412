@@ -2,10 +2,9 @@
 /*
 	Map-packs order in-game
 	
-	True - Order map-packs by their diffuculty
-	False - Order map-packs by their creation date (newest to oldest)
+	True — Order map-packs by their diffuculty
+	False — Order map-packs by their creation date (newest to oldest)
 */
-
 $orderMapPacksByStars = true;
 
 /*
@@ -13,10 +12,9 @@ $orderMapPacksByStars = true;
 	
 	This is April Fools joke by Cvolton, when leaderboards would fill with SAKUJES players and have 999 stats
 	
-	True - Enable this joke
-	False - Keep leaderboards normal on April Fools
+	True — Enable this joke
+	False — Keep leaderboards normal on April Fools
 */
-
 $sakujes = true;
 
 /*
@@ -24,11 +22,10 @@ $sakujes = true;
 
 	Whether you want unlisted rated levels to be counted in the creator points calculation or not
 
-	True - Count unlisted rated levels in the creator points calculation
-	False - Do not count unlisted rated levels in the creator points calculation
+	True — Count unlisted rated levels in the creator points calculation
+	False — Do not count unlisted rated levels in the creator points calculation
 
 */
-
 $unlistedCreatorPoints = false;
 
 /*
@@ -37,13 +34,12 @@ $unlistedCreatorPoints = false;
 	This setting will enable comment length limiter to prevent flooding with scripts
 	
 	$enableCommentLengthLimiter:
-		True - Use $maxCommentLength and $maxAccountCommentLength to limit comment length
-		False - Don't limit comments by their length
+		True — Use $maxCommentLength and $maxAccountCommentLength to limit comment length
+		False — Don't limit comments by their length
 	
 	$maxCommentLength - Maximum level comment length, default is 100
 	$maxAccountCommentLength - Maximum profile comment length, default is 140
 */
-
 $enableCommentLengthLimiter = true;
 $maxCommentLength = 100;
 $maxAccountCommentLength = 140;
@@ -56,12 +52,11 @@ $maxAccountCommentLength = 140;
 	Usually, daily levels can be played for 1 day and weekly levels can be played for 1 week.
 	After that these levels should 'expire' and no one can play them again (in daily/weekly tab)
 	
-	True - When the daily/weekly level expires, still show it for players, until the new level is set. (default)
-	False - When the daily/weekly level expires, show no level and a timer, until the new level is set.
+	True —When the daily/weekly level expires, still show it for players, until the new level is set. (default)
+	False — When the daily/weekly level expires, show no level and a timer, until the new level is set.
 	
 	Note: if you select "true" and daily level is not updated, it still can be beaten only once, then the player will see only a timer.
 */
-
 $oldDailyWeekly = false;
 
 /*
@@ -75,7 +70,6 @@ $oldDailyWeekly = false;
 
     Note: setting both to the same value will only allow this specific version
 */
-
 $minGameVersion = 0;
 $maxGameVersion = 0;
 
@@ -91,7 +85,6 @@ $maxGameVersion = 0;
     2.200 = 36
     ...
 */
-
 $minBinaryVersion = 0;
 $maxBinaryVersion = 0;
 
@@ -100,18 +93,16 @@ $maxBinaryVersion = 0;
 	
 	This setting will allow showing levels if they were posted from newer GD version, than yours
 	
-	True - Show all levels
-	False - Only show levels your GD version support
+	True — Show all levels
+	False — Only show levels your GD version support
 */
 
 $showAllLevels = true;
-
 /*
 	Amount of stars for leaderboards
 
 	$leaderboardMinStars - Minimum amount of stars for players to be displayed in the leaderboard, default is 10
 */
-
 $leaderboardMinStars = 10;
 
 /*
@@ -120,12 +111,11 @@ $leaderboardMinStars = 10;
 	This setting allows to disable updating of rated levels
 	
 	$ratedLevelsUpdates:
-		True - Allow updating rated levels
-		False - Disllow updating rated levels
+		True — Allow updating rated levels
+		False — Disllow updating rated levels
 		
 	$ratedLevelsUpdatesExceptions - Levels exceptions, works if you set $ratedLevelsUpdates to true
 */
-
 $ratedLevelsUpdates = true;
 $ratedLevelsUpdatesExceptions = [
     1,
@@ -138,13 +128,12 @@ $ratedLevelsUpdatesExceptions = [
 	This is fun setting, it will allow you to visually multiply comment likes by value you set
 	
 	$commentAutoLike:
-		True - Enable multiplying
-		False - Disable multiplying
+		True — Enable multiplying
+		False — Disable multiplying
 		
 	$specialCommentLikes - Comment IDs and their multipliers:
 		Comment ID => Multiplier
 */
-
 $commentAutoLike = false;
 $specialCommentLikes = [
     1 => 10,
@@ -156,10 +145,9 @@ $specialCommentLikes = [
 	
 	This setting will show unlisted levels for administrators
 	
-	True - Show unlisted levels
-	False - Don't show unlisted levels
+	True — Show unlisted levels
+	False — Don't show unlisted levels
 */
-
 $unlistedLevelsForAdmins = false;
 
 /*
@@ -167,10 +155,9 @@ $unlistedLevelsForAdmins = false;
 	
 	This setting will show rated levels in sent tab
 	
-	True - Show rated levels in sent tab
-	False - Don't show rated levels in sent tab
+	True — Show rated levels in sent tab
+	False — Don't show rated levels in sent tab
 */
-
 $ratedLevelsInSent = false;
 
 /*
@@ -179,10 +166,9 @@ $ratedLevelsInSent = false;
 	This setting replaces global leaderboard with moderators list
 	https://github.com/MegaSa1nt/GMDprivateServer/issues/181
 	
-	True - Replace global leaderboard with moderators list
-	False - Keep global leaderboard
+	True — Replace global leaderboard with moderators list
+	False — Keep global leaderboard
 */
-
 $moderatorsListInGlobal = false;
 
 /*
@@ -193,6 +179,32 @@ $moderatorsListInGlobal = false;
 	True — Cron should run automatically
 	False — Cron should run manually in dashboard
 */
-
 $automaticCron = false;
+
+/*
+	Show level ID in comments if mentioned
+	
+	Players can mention levels in comments and other places by writing #levelID
+	Example: "Did you play #648? It's cool!"
+	Minor issue is you can't open player's account anymore
+	
+	True — You can mention levels in comments and it will show first mentioned level
+	False — Comments in levels will never show level ID button
+*/
+$mentionLevelsInComments = true;
+
+/*
+	Difficulty votes
+	
+	Enable community votes for levels difficulty
+	
+	$normalLevelsVotes — should players be able to vote for difficulties on unrated levels
+		True — difficulty face votings are enabled
+		False — difficulty face votings are disabled
+	$demonDifficultiesVotes — should players be able to vote for demon difficulty faces
+		True — voting for demon faces is enabled
+		False — voting for demon faces is disabled
+*/
+$normalLevelsVotes = true;
+$demonDifficultiesVotes = true;
 ?>

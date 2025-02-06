@@ -214,13 +214,27 @@ class Library {
 	}
 	
 	public static function getUserString($user) {
-		//$userdata['userName'] = $this->makeClanUsername($user);
+		//$user['userName'] = Library::makeClanUsername($user);
 		return $user['userID'].':'.$user["userName"].':'.(is_numeric($user['extID']) ? $user['extID'] : 0);
 	}
 	
 	public static function isAccountAdmininstrator($accountID) {
 		$account = self::getAccountByID($accountID);
 		return $account['isAdmin'] != 0;
+	}
+	
+	public static function getCommentsOfUser($userID, $sortMode, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments->execute([':userID' => $userID]);
+		$comments = $comments->fetchAll();
+		
+		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0");
+		$commentsCount->execute([':userID' => $userID]);
+		$commentsCount = $commentsCount->fetchColumn();
+		
+		return ["comments" => $comments, "count" => $commentsCount];
 	}
 	
 	/*
@@ -270,7 +284,7 @@ class Library {
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
 			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
 			$updateLevel->execute([':levelID' => $levelID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
-			self::logAction($accountID, $IP, 23, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+			self::logAction($accountID, $IP, 23, $levelName, $levelDetails['levelDesc'], $levelID);
 			return ["success" => true, "levelID" => (string)$levelID];
 		}
 		
@@ -282,7 +296,7 @@ class Library {
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
 			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
 			$updateLevel->execute([':levelID' => $checkLevelExistenceByName, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
-			self::logAction($accountID, $IP, 23, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+			self::logAction($accountID, $IP, 23, $levelName, $levelDetails['levelDesc'], $levelID);
 			return ["success" => true, "levelID" => (string)$checkLevelExistenceByName];
 		}
 		
@@ -294,7 +308,7 @@ class Library {
 		$uploadLevel->execute([':userID' => $userID, ':accountID' => $accountID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelName' => $levelName, ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => $timestamp, ':IP' => $IP]);
 		$levelID = $db->lastInsertId();
 		rename(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, __DIR__.'/../../data/levels/'.$levelID);
-		self::logAction($accountID, $IP, 22, $levelDetails['levelName'], $levelDetails['levelDesc'], $levelID);
+		self::logAction($accountID, $IP, 22, $levelName, $levelDetails['levelDesc'], $levelID);
 		return ["success" => true, "levelID" => (string)$levelID];
 	}
 	
@@ -383,6 +397,168 @@ class Library {
 			$query6 = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID) VALUES (:levelID, INET6_ATON(:IP), :accountID)");
 			$query6->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
 		}
+	}
+	
+	public static function showCommentsBanScreen($text, $time) {
+		$time = $time - time();
+		if($time < 0) $time = 0;
+		return $_POST['gameVersion'] > 20 ? 'temp_'.$time.'_'.$text : '-1';
+	}
+	
+	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments->execute([':levelID' => $levelID]);
+		$comments = $comments->fetchAll();
+		
+		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID");
+		$commentsCount->execute([':levelID' => $levelID]);
+		$commentsCount = $commentsCount->fetchColumn();
+		
+		return ["comments" => $comments, "count" => $commentsCount];
+	}
+	
+	public static function uploadComment($accountID, $userID, $levelID, $userName, $comment, $percent) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		$comment = Escape::url_base64_encode($comment);
+		
+		$uploadAccountComment = $db->prepare("INSERT INTO comments (userID, levelID, percent, comment, timestamp)
+			VALUES (:userID, :levelID, :percent, :comment, :timestamp)");
+		$uploadAccountComment->execute([':userID' => $userID, ':levelID' => $levelID, ':percent' => $percent, ':comment' => $comment, ':timestamp' => time()]);
+		$commentID = $db->lastInsertId();
+
+		self::logAction($accountID, $IP, 15, $userName, $comment, $commentID, $levelID);
+		
+		return $commentID;
+	}
+	
+	public static function getFirstMentionedLevel($text) {
+		require __DIR__."/../../config/misc.php";
+		if(!$mentionLevelsInComments) return false;
+		
+		$textArray = explode(' ', $text);
+		foreach($textArray AS &$element) {
+			if(substr($element, 0, 1) != "#") continue;
+			
+			$element = substr($element, 1);
+			if(!is_numeric($element)) continue;
+			
+			return $element;
+		}
+		return false;
+	}
+	
+	public static function getLevelDifficulty($difficulty) {
+		switch(strtolower($difficulty)) {
+			case 1:
+			case "auto":
+				return ["name" => "Auto", "difficulty" => 50, "auto" => 1, "demon" => 0];
+			case 2:
+			case "easy":
+				return ["name" => "Easy", "difficulty" => 10, "auto" => 0, "demon" => 0];
+			case 3:
+			case "normal":
+				return ["name" => "Normal", "difficulty" => 20, "auto" => 0, "demon" => 0];
+			case 4:
+			case 5:
+			case "hard":
+				return ["name" => "Hard", "difficulty" => 30, "auto" => 0, "demon" => 0];
+			case 6:
+			case 7:
+			case "harder":
+				return ["name" => "Harder", "difficulty" => 40, "auto" => 0, "demon" => 0];
+			case 8:
+			case 9:
+			case "insane":
+				return ["name" => "Insane", "difficulty" => 50, "auto" => 0, "demon" => 0];
+			case 10:
+			case "demon":
+			case "harddemon":
+			case "hard_demon":
+			case "hard demon":
+				return ["name" => "Hard Demon", "difficulty" => 50, "auto" => 0, "demon" => 1];
+			case "easydemon":
+			case "easy_demon":
+			case "easy demon":
+				return ["name" => "Easy Demon", "difficulty" => 50, "auto" => 0, "demon" => 3];
+			case "mediumdemon":
+			case "medium_demon":
+			case "medium demon":
+				return ["name" => "Medium Demon", "difficulty" => 50, "auto" => 0, "demon" => 4];
+			case "insanedemon":
+			case "insane_demon":
+			case "insane demon":
+				return ["name" => "Insane Demon", "difficulty" => 50, "auto" => 0, "demon" => 5];
+			case "extremedemon":
+			case "extreme_demon":
+			case "extreme demon":
+				return ["name" => "Extreme Demon", "difficulty" => 50, "auto" => 0, "demon" => 6];
+			default:
+				return ["name" => "N/A", "difficulty" => 0, "auto" => 0, "demon" => 0];
+		}
+	}
+	
+	public static function prepareDifficultyForRating($difficulty, $auto, $demon, $demonDiff) {
+		if($auto) return "auto";
+		if($demon) {
+			switch($demonDiff) {
+				case 3:
+					return "easy demon";
+				case 4:
+					return "medium demon";
+				case 5:
+					return "insane demon";
+				case 6:
+					return "extreme demon";
+				default:
+					return "hard demon";
+			}
+		}
+		switch(true) {
+			case $difficulty >= 4.5:
+				return "insane";
+			case $difficulty >= 3.5:
+				return "harder";
+			case $difficulty >= 2.5:
+				return "hard";
+			case $difficulty >= 1.5:
+				return "normal";
+			case $difficulty >= 0.5:
+				return "easy";
+			default:
+				return "na";
+		}
+	}
+	
+	public static function rateLevel($levelID, $accountID, $difficulty, $stars, $verifyCoins, $featured) {
+		require __DIR__."/connection.php";
+		
+		$realDifficulty = self::getLevelDifficulty($difficulty);
+		if($featured) {
+			$epic = $featured - 1;
+			$featured = self::nextFeaturedID();
+		} else $epic = $featured = 0;
+		$starCoins = $verifyCoins != 0 ? 1 : 0;
+		$starDemon = $realDifficulty['demon'] != 0 ? 1 : 0;
+		$demonDiff = $realDifficulty['demon'];
+		$rateLevel = $db->prepare("UPDATE levels SET starDifficulty = :starDifficulty, difficultyDenominator = 10, starStars = :starStars, starFeatured = :starFeatured, starEpic = :starEpic, starCoins = :starCoins, starDemon = :starDemon, starDemonDiff = :starDemonDiff, starAuto = :starAuto, rateDate = :rateDate WHERE levelID = :levelID");
+		$rateLevel->execute([':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starEpic' => $epic, ':starCoins' => $starCoins, ':starDemon' => $starDemon, ':starDemonDiff' => $demonDiff, ':starAuto' => $realDifficulty['auto'], ':rateDate' => time(), ':levelID' => $levelID]);
+		return $realDifficulty['name'];
+	}
+	
+	public static function nextFeaturedID() {
+		require __DIR__."/connection.php";
+		
+		$featuredID = $db->prepare("SELECT starFeatured FROM levels ORDER BY starFeatured DESC LIMIT 1");
+		$featuredID->execute();
+		$featuredID = $featuredID->fetchColumn() + 1;
+		
+		return $featuredID;
 	}
 	
 	/*

@@ -58,4 +58,8 @@ class LevelUploadError {
 	
 	const FailedToWriteLevel = "-5";
 }
+
+class CommentsError {
+	const NothingFound = "-2";
+}
 ?>

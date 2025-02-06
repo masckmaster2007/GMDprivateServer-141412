@@ -13,7 +13,7 @@ if(!$installed) {
 			 `body` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 			 `timestamp` int(11) NOT NULL,
 			 PRIMARY KEY (`replyID`)
-			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 	$check = $db->query("SHOW TABLES LIKE 'demonlist'");
     	$exist = $check->fetchAll();
     	if(!empty($exist)) $db->query("DROP TABLE `demonlist`");
@@ -28,7 +28,7 @@ if(!$installed) {
 			 `accountID` int(20) NOT NULL DEFAULT '0',
 			 `timestamp` int(20) NOT NULL DEFAULT '0',
 			 PRIMARY KEY (`ID`)
-			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 	$check = $db->query("SHOW TABLES LIKE 'clans'");
     	$exist = $check->fetchAll();
     	if(empty($exist)) $db->query("CREATE TABLE `clans` (
@@ -40,7 +40,7 @@ if(!$installed) {
 			 `isClosed` int(11) NOT NULL DEFAULT '0',
 			 `creationDate` int(11) NOT NULL DEFAULT '0',
 			 PRIMARY KEY (`ID`)
-			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8");
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8");
 	$check = $db->query("SHOW TABLES LIKE 'clanrequests'");
     	$exist = $check->fetchAll();
     	if(empty($exist)) $db->query("CREATE TABLE `clanrequests` (
@@ -66,7 +66,7 @@ if(!$installed) {
 			 PRIMARY KEY (`ID`),
 			 KEY `name` (`name`),
 			 KEY `authorName` (`authorName`)
-			) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci");
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci");
 	$check = $db->query("SHOW TABLES LIKE 'bans'");
     	$exist = $check->fetchAll();
     	if(empty($exist)) $db->query("CREATE TABLE `bans` (
@@ -329,13 +329,16 @@ if(!$installed) {
 		if(empty($exist)) $db->query("ALTER TABLE `lists` ADD `dislikes` INT NOT NULL DEFAULT '0' AFTER `likes`");
 	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'difficultyDenominator'");
 		$exist = $check->fetchAll();
-		if(empty($exist)) $db->query("ALTER TABLE `levels` ADD `difficultyDenominator` INT NOT NULL DEFAULT '0' AFTER `starDifficulty`");
+		if(empty($exist)) $db->query("ALTER TABLE `levels` ADD `difficultyDenominator` INT NOT NULL DEFAULT '10' AFTER `starDifficulty`");
 	$check = $db->query("SHOW COLUMNS FROM `actions_downloads` LIKE 'accountID'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `actions_downloads` ADD `accountID` varchar(255) NOT NULL DEFAULT '' AFTER `ip`");
 	$check = $db->query("SHOW COLUMNS FROM `actions_likes` LIKE 'accountID'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `actions_likes` ADD `accountID` varchar(255) NOT NULL DEFAULT '' AFTER `ip`");
+	$check = $db->query("SHOW COLUMNS FROM `comments` LIKE 'userName'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `comments` DROP `userName`");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

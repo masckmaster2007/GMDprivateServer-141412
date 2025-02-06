@@ -17,6 +17,6 @@ foreach($accountComments['comments'] AS &$accountComment) {
 	$accountComment['comment'] = Escape::url_base64_encode(Escape::translit(Escape::url_base64_decode($accountComment['comment'])));
 	$echoString .= "2~".$accountComment["comment"]."~3~".$accountComment["userID"]."~4~".$likes."~5~0~7~".$accountComment["isSpam"]."~9~".$timestamp."~6~".$accountComment["commentID"]."|";
 }
-$echoString = substr($echoString, 0, -1);
+$echoString = rtrim($echoString, "|");
 exit($echoString."#".$accountComments['count'].":".$commentsPage.":10");
 ?>

@@ -215,15 +215,15 @@ foreach($levels['levels'] as &$level) {
 	if($gameVersion < 20) $level['levelDesc'] = Escape::gd(Escape::url_base64_decode($level['levelDesc']));
 	$levelsStatsArray[] = ["levelID" => $level["levelID"], "stars" => $level["starStars"], 'coins' => $level["starCoins"]];
 	if(isset($gauntlet)) $echoString .= "44:1:";
-	$echoString .= "1:".$level["levelID"].":2:".Escape::translit($level["levelName"]).":5:".$level["levelVersion"].":6:".$level["userID"].":8:".$level["difficultyDenominator"].":9:".$level["starDifficulty"].":10:".$level["downloads"].":12:".$level["audioTrack"].":13:".$level["gameVersion"].":14:".$level["likes"].":16:".$level["dislikes"].":17:".$level["starDemon"].":43:".$level["starDemonDiff"].":25:".$level["starAuto"].":18:".$level["starStars"].":19:".$level["starFeatured"].":42:".$level["starEpic"].":45:".$level["objects"].":3:".Escape::translit($level["levelDesc"]).":15:".$level["levelLength"].":30:".$level["original"].":31:".$level['twoPlayer'].":37:".$level["coins"].":38:".$level["starCoins"].":39:".$level["requestedStars"].":46:".$level["wt"].":47:".$level["wt2"].":40:".$level["isLDM"].":35:".$level["songID"]."|";
+	$echoString .= "1:".$level["levelID"].":2:".Escape::translit($level["levelName"]).":5:".$level["levelVersion"].":6:".$level["userID"].":8:".$level["difficultyDenominator"].":9:".$level["starDifficulty"].":10:".$level["downloads"].":12:".$level["audioTrack"].":13:".$level["gameVersion"].":14:".$level["likes"].":16:".$level["dislikes"].":17:".$level["starDemon"].":43:".$level["starDemonDiff"].":25:".$level["starAuto"].":18:".$level["starStars"].":19:".$level["starFeatured"].":42:".$level["starEpic"].":45:".$level["objects"].":3:".Escape::translit($level["levelDesc"]).":15:".$level["levelLength"].":28:".Library::makeTime($level['uploadDate']).($level['updateDate'] ? ":29:".Library::makeTime($level['updateDate']) : "").":30:".$level["original"].":31:".$level['twoPlayer'].":37:".$level["coins"].":38:".$level["starCoins"].":39:".$level["requestedStars"].":46:".$level["wt"].":47:".$level["wt2"].":40:".$level["isLDM"].":35:".$level["songID"]."|";
 	if($level["songID"] != 0) {
 		$song = Library::getSongString($level["songID"]);
 		if($song) $songsString .= $song."~:~";
 	}
 	$userString .= Library::getUserString($level)."|";
 }
-$echoString = substr($echoString, 0, -1);
-$userString = substr($userString, 0, -1);
-$songsString = substr($songsString, 0, -3);
-exit($echoString."#".$userString.($gameVersion > 18 ? "#".$songsString : '')."#".$levels['count'].":".$offset.":10"."#".Security::generateLevelsHash($levelsStatsArray));
+$echoString = rtrim($echoString, "|");
+$userString = rtrim($userString, "|");
+$songsString = rtrim($songsString, "~:~");
+exit($echoString."#".$userString.($gameVersion > 18 ? "#".$songsString : '')."#".$levels['count'].":".$pageOffset.":10"."#".Security::generateLevelsHash($levelsStatsArray));
 ?>
