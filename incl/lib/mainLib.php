@@ -136,6 +136,36 @@ class Library {
 		return $user;
 	}
 	
+	public static function getUserByUserName($userName) {
+		require __DIR__."/connection.php";
+		
+		$user = $db->prepare("SELECT * FROM users WHERE userName LIKE :userName ORDER BY isRegistered DESC LIMIT 1");
+		$user->execute([':userName' => $userName]);
+		$user = $user->fetch();
+		
+		return $user;
+	}
+	
+	public static function getUserFromSearch($player) {
+		switch(true) {
+			case is_numeric($player):
+				$userID = self::getUserID($player);
+				$player = self::getUserByID($userID);
+				break;
+			case substr($player, 0, 1) == 'u':
+				$userID = substr($player, 1);
+				if(is_numeric($userID)) {
+					$player = self::getUserByID($userID);
+					break;
+				}
+			default:
+				$player = self::getUserByUserName($player);
+				break;
+		}
+		
+		return $player;
+	}
+	
 	public static function getFriendRequest($accountID, $targetAccountID) {
 		require __DIR__."/connection.php";
 		
@@ -315,7 +345,7 @@ class Library {
 	public static function getLevels($filters, $order, $orderSorting, $queryJoin, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(" ) AND ( ", $filters).") ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
+		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(") AND (", $filters).") ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
 		$levels->execute();
 		$levels = $levels->fetchAll();
 		
@@ -391,12 +421,16 @@ class Library {
 		
 		$getDownloads = $db->prepare("SELECT count(*) FROM actions_downloads WHERE levelID = :levelID AND (ip = INET6_ATON(:IP) OR accountID = :accountID)");
 		$getDownloads->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
-		if($getDownloads->fetchColumn() == 0) {
-			$query2 = $db->prepare("UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID");
-			$query2->execute([':levelID' => $levelID]);
-			$query6 = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID) VALUES (:levelID, INET6_ATON(:IP), :accountID)");
-			$query6->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
-		}
+		$getDownloads = $getDownloads->fetchColumn();
+		if($getDownloads) return false;
+		
+		$addDownload = $db->prepare("UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID");
+		$addDownload->execute([':levelID' => $levelID]);
+		$insertAction = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID)
+			VALUES (:levelID, INET6_ATON(:IP), :accountID)");
+		$insertAction->execute([':levelID' => $levelID, ':IP' => $IP, ':accountID' => $accountID]);
+		
+		return true;
 	}
 	
 	public static function showCommentsBanScreen($text, $time) {
@@ -520,6 +554,16 @@ class Library {
 			}
 		}
 		switch(true) {
+			case $difficulty >= 9.5:
+				return "extreme demon";
+			case $difficulty >= 8.5:
+				return "insane demon";
+			case $difficulty >= 7.5:
+				return "medium demon";
+			case $difficulty >= 6.5:
+				return "easy demon";
+			case $difficulty >= 5.5 && $difficulty < 6.5:
+				return "hard demon";
 			case $difficulty >= 4.5:
 				return "insane";
 			case $difficulty >= 3.5:
@@ -546,8 +590,10 @@ class Library {
 		$starCoins = $verifyCoins != 0 ? 1 : 0;
 		$starDemon = $realDifficulty['demon'] != 0 ? 1 : 0;
 		$demonDiff = $realDifficulty['demon'];
+		
 		$rateLevel = $db->prepare("UPDATE levels SET starDifficulty = :starDifficulty, difficultyDenominator = 10, starStars = :starStars, starFeatured = :starFeatured, starEpic = :starEpic, starCoins = :starCoins, starDemon = :starDemon, starDemonDiff = :starDemonDiff, starAuto = :starAuto, rateDate = :rateDate WHERE levelID = :levelID");
 		$rateLevel->execute([':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starEpic' => $epic, ':starCoins' => $starCoins, ':starDemon' => $starDemon, ':starDemonDiff' => $demonDiff, ':starAuto' => $realDifficulty['auto'], ':rateDate' => time(), ':levelID' => $levelID]);
+		
 		return $realDifficulty['name'];
 	}
 	
@@ -559,6 +605,159 @@ class Library {
 		$featuredID = $featuredID->fetchColumn() + 1;
 		
 		return $featuredID;
+	}
+	
+	public static function setLevelAsDaily($levelID, $accountID, $type) {
+		require __DIR__."/connection.php";
+		
+		$isDaily = self::isLevelDaily($levelID, $type);
+		if($isDaily) return false;
+		
+		$dailyTime = self::nextDailyTime($type);
+		
+		$setDaily = $db->prepare("INSERT INTO dailyfeatures (levelID, type, timestamp)
+			VALUES (:levelID, :type, :timestamp)");
+		$setDaily->execute([':levelID' => $levelID, ':type' => $type, ':timestamp' => $dailyTime]);
+		
+		return $dailyTime;
+	}
+	
+	public static function isLevelDaily($levelID, $type) {
+		require __DIR__."/connection.php";
+		
+		$isDaily = $db->prepare("SELECT feaID FROM dailyfeatures WHERE levelID = :levelID AND type = :type AND timestamp >= :time");
+		$isDaily->execute([':levelID' => $levelID, ':type' => $type, ':time' => time() - ($type ? 604800 : 86400)]);
+		$isDaily = $isDaily->fetchColumn();
+		
+		return $isDaily;
+	}
+	
+	public static function nextDailyTime($type) {
+		require __DIR__."/connection.php";
+		
+		$typeTime = $type ? 604800 : 86400;
+		
+		$dailyTime = $db->prepare("SELECT timestamp FROM dailyfeatures WHERE type = :type AND timestamp >= :time ORDER BY timestamp DESC LIMIT 1");
+		$dailyTime->execute([':type' => $type, ':time' => time() - $typeTime]);
+		$dailyTime = $dailyTime->fetchColumn();
+		
+		if(!$dailyTime) $dailyTime = time();
+		$dailyTime = $type ? strtotime(date('d.m.Y', $dailyTime)." next monday") : strtotime(date('d.m.Y', $dailyTime)." tomorrow");
+		
+		return $dailyTime;
+	}
+	
+	public static function setLevelAsEvent($levelID, $accountID, $duration, $rewards) {
+		require __DIR__."/connection.php";
+		
+		$isEvent = self::isLevelEvent($levelID);
+		if($isEvent) return false;
+		
+		$eventTime = self::nextEventTime($duration);
+		
+		$setEvent = $db->prepare("INSERT INTO events (levelID, timestamp, duration, rewards)
+			VALUES (:levelID, :timestamp, :duration, :rewards)");
+		$setEvent->execute([':levelID' => $levelID, ':timestamp' => $eventTime, ':duration' => $eventTime + $duration, ':rewards' => $rewards]);
+		
+		return $eventTime;
+	}
+	
+	public static function isLevelEvent($levelID) {
+		require __DIR__."/connection.php";
+		
+		$isEvent = $db->prepare("SELECT feaID FROM events WHERE levelID = :levelID AND duration >= :time");
+		$isEvent->execute([':levelID' => $levelID, ':time' => time()]);
+		$isEvent = $isEvent->fetchColumn();
+		
+		return $isEvent;
+	}
+	
+	public static function nextEventTime($duration) {
+		require __DIR__."/connection.php";
+		
+		$time = time();
+		
+		$eventTime = $db->prepare("SELECT duration FROM events WHERE timestamp < :time OR duration >= :duration ORDER BY duration DESC LIMIT 1");
+		$eventTime->execute([':time' => $time, ':duration' => $time + $duration]);
+		$eventTime = $eventTime->fetchColumn();
+		
+		if(!$eventTime) $eventTime = $time;
+		
+		return $eventTime;
+	}
+	
+	public static function sendLevel($levelID, $accountID, $difficulty, $stars, $featured) {
+		require __DIR__."/connection.php";
+		
+		$realDifficulty = self::getLevelDifficulty($difficulty);
+		$starDemon = $realDifficulty['demon'] != 0 ? 1 : 0;
+		$demonDiff = $realDifficulty['demon'];
+		
+		$isSent = self::isLevelSent($levelID, $accountID);
+		if($isSent) return false;
+		
+		$sendLevel = $db->prepare("INSERT INTO suggest (suggestBy, suggestLevelId, suggestDifficulty, suggestStars, suggestFeatured, suggestAuto, suggestDemon, timestamp)
+			VALUES (:accountID, :levelID, :starDifficulty, :starStars, :starFeatured, :starAuto, :starDemon, :timestamp)");
+		$sendLevel->execute([':accountID' => $accountID, ':levelID' => $levelID, ':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starAuto' => $realDifficulty['auto'], ':starDemon' => $realDifficulty['demon'], ':timestamp' => time()]);
+		
+		return $realDifficulty['name'];
+	}
+	
+	public static function isLevelSent($levelID, $accountID) {
+		require __DIR__."/connection.php";
+		
+		$isSent = $db->prepare("SELECT count(*) FROM suggest WHERE suggestLevelId = :levelID AND suggestBy = :accountID");
+		$isSent->execute([':levelID' => $levelID, ':accountID' => $accountID]);
+		$isSent = $isSent->fetchColumn();
+		
+		return $isSent > 0;
+	}
+	
+	public static function removeDailyLevel($levelID, $accountID, $type) {
+		require __DIR__."/connection.php";
+		
+		$isDaily = self::isLevelDaily($levelID, $type);
+		if(!$isDaily) return false;
+		
+		$removeDaily = $db->prepare("UPDATE dailyfeatures SET timestamp = timestamp * -1 WHERE feaID = :feaID");
+		$removeDaily->execute([':feaID' => $isDaily]);
+		
+		return true;
+	}
+	
+	public static function removeEventLevel($levelID, $accountID) {
+		require __DIR__."/connection.php";
+		
+		$isEvent = self::isLevelEvent($levelID);
+		if(!$isEvent) return false;
+		
+		$removeEvent = $db->prepare("UPDATE events SET duration = duration * -1 WHERE feaID = :feaID");
+		$removeEvent->execute([':feaID' => $isEvent]);
+		
+		return true;
+	}
+	
+	public static function moveLevel($levelID, $player) {
+		require __DIR__."/connection.php";
+		
+		$setAccount = $db->prepare("UPDATE levels SET extID = :extID, userID = :userID, userName = :userName WHERE levelID = :levelID");
+		$setAccount->execute([':extID' => $player['extID'], ':userID' => $player['userID'], ':userName' => $player['userName'], ':levelID' => $levelID]);
+		
+		return true;
+	}
+	
+	public static function lockUpdatingLevel($levelID, $lockUpdating) {
+		require __DIR__."/connection.php";
+		
+		$checkLocking = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND updateLocked = :updateLocked");
+		$checkLocking->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
+		$checkLocking = $checkLocking->fetchColumn();
+		if($lockUpdating == $checkLocking) return false;
+		
+		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID");
+		$lockLevel->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
+		
+		return true;
 	}
 	
 	/*
@@ -683,7 +882,8 @@ class Library {
 	public static function logAction($accountID, $IP, $type, $value1 = '', $value2 = '', $value3 = '', $value4 = '', $value5 = '', $value6 = '') {
 		require __DIR__."/connection.php";
 		
-		$insertAction = $db->prepare('INSERT INTO actions (account, type, timestamp, value, value2, value3, value4, value5, value6, IP) VALUES (:account, :type, :timestamp, :value, :value2, :value3, :value4, :value5, :value6, :IP)');
+		$insertAction = $db->prepare('INSERT INTO actions (account, type, timestamp, value, value2, value3, value4, value5, value6, IP)
+			VALUES (:account, :type, :timestamp, :value, :value2, :value3, :value4, :value5, :value6, :IP)');
 		$insertAction->execute([':account' => $accountID, ':type' => $type, ':value' => $value1, ':value2' => $value2, ':value3' => $value3, ':value4' => $value4, ':value5' => $value5, ':value6' => $value6, ':timestamp' => time(), ':IP' => $IP]);
 		
 		return $db->lastInsertId();
@@ -715,13 +915,17 @@ class Library {
 				break;
 			case 2:
 				// taken from https://stackoverflow.com/a/36297417
+				$isFuture = false;
 				$time = time() - $time;
-				$time = ($time < 1) ? 1 : $time;
+				if($time < 0) {
+					$time = abs($time);
+					$isFuture = true;
+				}
 				$tokens = array (31536000 => 'year', 2592000 => 'month', 604800 => 'week', 86400 => 'day', 3600 => 'hour', 60 => 'minute', 1 => 'second');
 				foreach($tokens as $unit => $text) {
 					if($time < $unit) continue;
 					$numberOfUnits = floor($time / $unit);
-					return $numberOfUnits.' '.$text.(($numberOfUnits > 1) ? 's' : '');
+					return ($isFuture ? 'in ' : '').$numberOfUnits.' '.$text.(($numberOfUnits > 1) ? 's' : '');
 				}
 				break;
 			default:

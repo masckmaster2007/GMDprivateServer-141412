@@ -125,9 +125,12 @@ switch($type) {
 				$firstCharacter = substr($str, 0, 1);
 				if($firstCharacter == 'u') {
 					$potentialUserID = substr($str, 1);
-					if(is_numeric($potentialUserID)) $filters[] = "userID = ".$potentialUserID;
-					else $filters[] = "levelName LIKE '%".$str."%'";
-				} else $filters[] = "levelName LIKE '%".$str."%'";
+					if(is_numeric($potentialUserID)) {
+						$filters[] = "userID = ".$potentialUserID;
+						break;
+					}
+				} 
+				$filters[] = "levelName LIKE '%".$str."%'";
 			}
 		}
 		break;
@@ -199,8 +202,8 @@ switch($type) {
 		$filters = ["levelID IN (".$listLevels.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")) OR extID = ".$accountID.")"];
 		break;
 	case 27: // Sent levels
-		$queryJoin = "INNER JOIN suggest ON levels.levelID = suggest.suggestLevelId";
-		$filters[] = "suggest.suggestLevelId > 0";
+		$queryJoin = "JOIN (SELECT suggestLevelId AS levelID, MAX(suggest.timestamp) AS timestamp FROM suggest GROUP BY levelID) suggest ON levels.levelID = suggest.levelID";
+		$filters[] = "suggest.levelID > 0";
 		if(!$ratedLevelsInSent) $filters[] = "starStars = 0";
 		$order = 'suggest.timestamp';
 		break;

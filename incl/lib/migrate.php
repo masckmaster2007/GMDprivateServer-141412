@@ -272,12 +272,14 @@ if(!$installed) {
 		if(!empty($exist)) {
 			$check = $db->query("SHOW COLUMNS FROM `events` LIKE 'rewards'");
 				$exist = $check->fetchAll();
-				if(empty($exist)) $db->query("ALTER TABLE `events` ADD `rewards` varchar(2048) NOT NULL DEFAULT '0' AFTER `duration`");
+				if(empty($exist)) $db->query("ALTER TABLE `events` ADD `rewards` varchar(2048) NOT NULL DEFAULT '' AFTER `duration`");
 			$db->query("UPDATE events SET rewards = CONCAT(type,  \",\", reward)");
 			$check = $db->query("SHOW COLUMNS FROM `events` LIKE 'type'");
 				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query("ALTER TABLE `events` DROP `type`");
-			$db->query("ALTER TABLE `events` DROP `reward`");
+				if(!empty($exist)) {
+					$db->query("ALTER TABLE `events` DROP `type`");
+					$db->query("ALTER TABLE `events` DROP `reward`");
+				}
 		}
 	$check = $db->query("SHOW COLUMNS FROM `vaultcodes` LIKE 'reward'");
 		$exist = $check->fetchAll();
@@ -288,8 +290,10 @@ if(!$installed) {
 			$db->query("UPDATE vaultcodes SET rewards = CONCAT(type,  \",\", reward)");
 			$check = $db->query("SHOW COLUMNS FROM `vaultcodes` LIKE 'type'");
 				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query("ALTER TABLE `vaultcodes` DROP `type`");
-			$db->query("ALTER TABLE `vaultcodes` DROP `reward`");
+				if(!empty($exist)) {
+					$db->query("ALTER TABLE `vaultcodes` DROP `type`");
+					$db->query("ALTER TABLE `vaultcodes` DROP `reward`");
+				}
 		}
 	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'readTime'");
 		$exist = $check->fetchAll();
