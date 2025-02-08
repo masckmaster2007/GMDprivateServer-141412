@@ -42,3 +42,9 @@ Network Trash Folder
 Temporary Items
 .apdisk
 data/
+music/gdps.*
+music/s*.*
+music/*.json
+sfx/gdps.*
+sfx/s*.*
+sfx/*.json

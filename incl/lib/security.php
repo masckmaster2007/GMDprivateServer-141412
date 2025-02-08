@@ -157,6 +157,7 @@ class Security {
 		while($i)$hash[--$i] = $levelString[$i*$m];
 		return sha1($hash);
 	}
+	
 	public static function generateSecondHash($levelString) {
 		return sha1($levelString."xI25fpAapCQg");
 	}

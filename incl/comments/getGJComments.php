@@ -33,7 +33,8 @@ switch(true) {
 if(empty($comments['comments'])) exit(CommentsError::NothingFound);
 
 foreach($comments['comments'] AS &$comment) {
-	$timestamp = Library::makeTime($comment['timestamp']);
+	$extraTextArray = [];
+	if($comment['userID'] == $comment['levelUserID']) $extraTextArray[] = 'Creator';
 	
 	$comment['comment'] = Escape::translit(Escape::url_base64_decode($comment["comment"]));
 	$showLevelID = $displayLevelID ? $comment["levelID"] : Library::getFirstMentionedLevel($comment['comment']);
@@ -43,6 +44,7 @@ foreach($comments['comments'] AS &$comment) {
 	if($commentAutoLike && array_key_exists($comment["commentID"], $specialCommentLikes)) $likes = $likes * $specialCommentLikes[$comment["commentID"]]; // Multiply by the specified value
 	if($likes < -2) $comment["isSpam"] = 1;
 	
+	$timestamp = Library::makeTime($comment['timestamp'], $extraTextArray);
 	$commentsString .= ($showLevelID ? "1~".$showLevelID."~" : "")."2~".$commentText."~3~".$comment["userID"]."~4~".$likes."~5~0~7~".$comment["isSpam"]."~9~".$timestamp."~6~".$comment["commentID"]."~10~".$comment["percent"];
 	$user = Library::getUserByID($comment['userID']);
 	if($binaryVersion > 31) {

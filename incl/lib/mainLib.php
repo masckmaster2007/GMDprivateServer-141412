@@ -267,6 +267,20 @@ class Library {
 		return ["comments" => $comments, "count" => $commentsCount];
 	}
 	
+	public static function deleteAccountComment($userID, $commentID) {
+		require __DIR__."/connection.php";
+		
+		$getComment = $db->prepare("SELECT count(*) FROM acccomments WHERE userID = :userID AND commentID = :commentID");
+		$getComment->execute([':userID' => $userID, ':commentID' => $commentID]);
+		$getComment = $getComment->fetchColumn();
+		if(!$getComment) return false;
+		
+		$deleteComment = $db->prepare("DELETE FROM acccomments WHERE commentID = :commentID");
+		$deleteComment->execute([':commentID' => $commentID]);
+		
+		return true;
+	}
+	
 	/*
 		Levels-related functions
 	*/
@@ -306,26 +320,34 @@ class Library {
 		
 		$IP = IP::getIP();
 		
-		$checkLevelExistenceByID = $db->prepare("SELECT count(*) FROM levels WHERE levelID = :levelID AND userID = :userID");
+		$checkLevelExistenceByID = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND userID = :userID");
 		$checkLevelExistenceByID->execute([':levelID' => $levelID, ':userID' => $userID]);
-		$checkLevelExistenceByID = $checkLevelExistenceByID->fetchColumn();
+		$checkLevelExistenceByID = $checkLevelExistenceByID->fetch();
 		if($checkLevelExistenceByID) {
+			if($checkLevelExistenceByID['updateLocked']) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
+			
 			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$levelID, $levelString);
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
-			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
-			$updateLevel->execute([':levelID' => $levelID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			
+			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
+			$updateLevel->execute([':levelID' => $levelID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			
 			self::logAction($accountID, $IP, 23, $levelName, $levelDetails['levelDesc'], $levelID);
 			return ["success" => true, "levelID" => (string)$levelID];
 		}
 		
-		$checkLevelExistenceByName = $db->prepare("SELECT levelID FROM levels WHERE levelName LIKE :levelName AND userID = :userID ORDER BY levelID DESC LIMIT 1");
+		$checkLevelExistenceByName = $db->prepare("SELECT levelID, updateLocked FROM levels WHERE levelName LIKE :levelName AND userID = :userID ORDER BY levelID DESC LIMIT 1");
 		$checkLevelExistenceByName->execute([':levelName' => $levelName, ':userID' => $userID]);
 		$checkLevelExistenceByName = $checkLevelExistenceByName->fetchColumn();
 		if($checkLevelExistenceByName) {
+			if($checkLevelExistenceByID['updateLocked']) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
+			
 			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$checkLevelExistenceByName, $levelString);
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
-			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = :levelVersion, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
-			$updateLevel->execute([':levelID' => $checkLevelExistenceByName, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			
+			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
+			$updateLevel->execute([':levelID' => $checkLevelExistenceByName, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
+			
 			self::logAction($accountID, $IP, 23, $levelName, $levelDetails['levelDesc'], $levelID);
 			return ["success" => true, "levelID" => (string)$checkLevelExistenceByName];
 		}
@@ -333,9 +355,11 @@ class Library {
 		$timestamp = time();
 		$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, $levelString);
 		if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
+		
 		$uploadLevel = $db->prepare("INSERT INTO levels (userID, extID, userName, gameVersion, binaryVersion, levelName, levelDesc, levelVersion, levelLength, audioTrack, auto, original, twoPlayer, songID, objects, coins, requestedStars, extraString, levelString, levelInfo, unlisted, unlisted2, hostname, isLDM, wt, wt2, settingsString, songIDs, sfxIDs, ts, password, uploadDate, updateDate)
-			VALUES (:userID, :accountID, :userName, :gameVersion, :binaryVersion, :levelName, :levelDesc, :levelVersion, :levelLength, :audioTrack, :auto, :original, :twoPlayer, :songID, :objects, :coins, :requestedStars, :extraString, '', :levelInfo, :unlisted, :unlisted, :IP, :isLDM, :wt, :wt2, :settingsString, :songIDs, :sfxIDs, :ts, :password, :timestamp, 0)");
-		$uploadLevel->execute([':userID' => $userID, ':accountID' => $accountID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelName' => $levelName, ':levelDesc' => $levelDetails['levelDesc'], ':levelVersion' => $levelDetails['levelVersion'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => $timestamp, ':IP' => $IP]);
+			VALUES (:userID, :accountID, :userName, :gameVersion, :binaryVersion, :levelName, :levelDesc, 1, :levelLength, :audioTrack, :auto, :original, :twoPlayer, :songID, :objects, :coins, :requestedStars, :extraString, '', :levelInfo, :unlisted, :unlisted, :IP, :isLDM, :wt, :wt2, :settingsString, :songIDs, :sfxIDs, :ts, :password, :timestamp, 0)");
+		$uploadLevel->execute([':userID' => $userID, ':accountID' => $accountID, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelName' => $levelName, ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => $timestamp, ':IP' => $IP]);
+		
 		$levelID = $db->lastInsertId();
 		rename(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, __DIR__.'/../../data/levels/'.$levelID);
 		self::logAction($accountID, $IP, 22, $levelName, $levelDetails['levelDesc'], $levelID);
@@ -442,7 +466,7 @@ class Library {
 	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT *, levels.userID AS levelUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':levelID' => $levelID]);
 		$comments = $comments->fetchAll();
 		
@@ -737,7 +761,7 @@ class Library {
 		return true;
 	}
 	
-	public static function moveLevel($levelID, $player) {
+	public static function moveLevel($levelID, $accountID, $player) {
 		require __DIR__."/connection.php";
 		
 		$setAccount = $db->prepare("UPDATE levels SET extID = :extID, userID = :userID, userName = :userName WHERE levelID = :levelID");
@@ -746,16 +770,100 @@ class Library {
 		return true;
 	}
 	
-	public static function lockUpdatingLevel($levelID, $lockUpdating) {
+	public static function lockUpdatingLevel($levelID, $accountID, $lockUpdating) {
 		require __DIR__."/connection.php";
-		
-		$checkLocking = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND updateLocked = :updateLocked");
-		$checkLocking->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
-		$checkLocking = $checkLocking->fetchColumn();
-		if($lockUpdating == $checkLocking) return false;
 		
 		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID");
 		$lockLevel->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
+		
+		return true;
+	}
+	
+	public static function deleteComment($userID, $commentID) {
+		require __DIR__."/connection.php";
+		
+		$getComment = $db->prepare("SELECT count(*) FROM comments WHERE userID = :userID AND commentID = :commentID");
+		$getComment->execute([':userID' => $userID, ':commentID' => $commentID]);
+		$getComment = $getComment->fetchColumn();
+		if(!$getComment) return false;
+		
+		$deleteComment = $db->prepare("DELETE FROM comments WHERE commentID = :commentID");
+		$deleteComment->execute([':commentID' => $commentID]);
+		
+		return true;
+	}
+	
+	public static function renameLevel($levelID, $accountID, $levelName) {
+		require __DIR__."/connection.php";
+		
+		$renameLevel = $db->prepare("UPDATE levels SET levelName = :levelName WHERE levelID = :levelID");
+		$renameLevel->execute([':levelID' => $levelID, ':levelName' => $levelName]);
+		
+		return true;
+	}
+	
+	public static function changeLevelPassword($levelID, $accountID, $newPassword) {
+		require __DIR__."/connection.php";
+		
+		if($newPassword == '000000') $newPassword = '';
+		
+		$changeLevelPassword = $db->prepare("UPDATE levels SET password = :password WHERE levelID = :levelID");
+		$changeLevelPassword->execute([':levelID' => $levelID, ':password' => "1".$newPassword]);
+		
+		return true;
+	}
+	
+	public static function changeLevelSong($levelID, $accountID, $songID) {
+		require __DIR__."/connection.php";
+		
+		$changeLevelSong = $db->prepare("UPDATE levels SET songID = :songID WHERE levelID = :levelID");
+		$changeLevelSong->execute([':levelID' => $levelID, ':songID' => $songID]);
+		
+		return true;
+	}
+	
+	public static function changeLevelDescription($levelID, $accountID, $description) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		
+		$changeLevelDescription = $db->prepare("UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID");
+		$changeLevelDescription->execute([':levelID' => $levelID, ':levelDesc' => Escape::url_base64_encode($description)]);
+		
+		return true;
+	}
+	
+	public static function changeLevelPrivacy($levelID, $accountID, $privacy) {
+		require __DIR__."/connection.php";
+		
+		$changeLevelPrivacy = $db->prepare("UPDATE levels SET unlisted = :privacy, unlisted2 = :privacy WHERE levelID = :levelID");
+		$changeLevelPrivacy->execute([':levelID' => $levelID, ':privacy' => $privacy]);
+		
+		return true;
+	}
+	
+	public static function shareCreatorPoints($levelID, $accountID, $targetUserID) {
+		require __DIR__."/connection.php";
+		
+		$changeLevel = $db->prepare("UPDATE levels SET isCPShared = 1 WHERE levelID = :levelID");
+		$changeLevel->execute([':levelID' => $levelID]);
+		
+		$checkIfShared = $db->prepare("SELECT count(*) FROM cpshares WHERE levelID = :levelID AND userID = :userID");
+		$checkIfShared->execute([':levelID' => $levelID, ':userID' => $targetUserID]);
+		$checkIfShared = $checkIfShared->fetchColumn();
+		if($checkIfShared) return false;
+		
+		$shareCreatorPoints = $db->prepare("INSERT INTO cpshares (levelID, userID)
+			VALUES (:levelID, :userID)");
+		$shareCreatorPoints->execute([':levelID' => $levelID, ':userID' => $targetUserID]);
+		
+		return true;
+	}
+	
+	public static function lockCommentingOnLevel($levelID, $accountID, $lockCommenting) {
+		require __DIR__."/connection.php";
+
+		$lockLevel = $db->prepare("UPDATE levels SET commentLocked = :commentLocked WHERE levelID = :levelID");
+		$lockLevel->execute([':commentLocked' => $lockCommenting, ':levelID' => $levelID]);
 		
 		return true;
 	}
@@ -875,6 +983,429 @@ class Library {
 		return $library['IDs'][$songID];
 	}
 	
+	public static function updateLibraries($token, $expires, $mainServerTime, $type = 0) {
+		require __DIR__."/../../config/dashboard.php";
+		require_once __DIR__."/exploitPatch.php";
+		
+		$servers = $times = [];
+		
+		$types = ['sfx', 'music'];
+		if(!isset($customLibrary)) global $customLibrary;
+		if(empty($customLibrary)) $customLibrary = [[1, 'Geometry Dash', 'https://geometrydashfiles.b-cdn.net'], [3, $gdps, null]];
+		
+		foreach($customLibrary AS $library) {
+			if(($types[$type] == 'sfx' AND $library[3] === 1) OR ($types[$type] == 'music' AND $library[3] === 0)) continue;
+			
+			if($library[2] !== null) $servers['s'.$library[0]] = $library[2];
+		}
+		
+		$updatedLib = false;
+		foreach($servers AS $key => &$server) {
+			$versionUrl = $server.'/'.$types[$type].'/'.$types[$type].'library_version'.($types[$type] == 'music' ? '_02' : '').'.txt';
+			$dataUrl = $server.'/'.$types[$type].'/'.$types[$type].'library'.($types[$type] == 'music' ? '_02' : '').'.dat';
+
+			$oldVersion = file_exists(__DIR__.'/../../'.$types[$type].'/'.$key.'.txt') ? file_get_contents(__DIR__.'/../../'.$types[$type].'/'.$key.'.txt') : [0, 0];
+			$times[] = (int)$oldVersion[1];
+			
+			if((int)$oldVersion[1] + 600 > time()) continue; // Download library only once per 10 minutes
+			
+			$curl = curl_init($versionUrl.'?token='.$token.'&expires='.$expires);
+			curl_setopt_array($curl, [
+				CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+				CURLOPT_RETURNTRANSFER => 1,
+				CURLOPT_FOLLOWLOCATION => 1
+			]);
+			$newVersion = (int)Escape::number(curl_exec($curl));
+			curl_close($curl);
+			
+			if($newVersion > $oldVersion[0] || !$oldVersion[0]) {
+				file_put_contents(__DIR__.'/../../'.$types[$type].'/'.$key.'.txt', $newVersion.', '.time());
+				
+				$download = curl_init($dataUrl.'?token='.$token.'&expires='.$expires.'&dashboard=1');
+				curl_setopt_array($download, [
+					CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+					CURLOPT_RETURNTRANSFER => 1,
+					CURLOPT_FOLLOWLOCATION => 1
+				]);
+				$dat = curl_exec($download);
+				$resultStatus = curl_getinfo($download, CURLINFO_HTTP_CODE);
+				curl_close($download);
+				
+				if($resultStatus == 200) {
+					file_put_contents(__DIR__.'/../../'.$types[$type].'/'.$key.'.dat', $dat);
+					$updatedLib = true;
+				}
+			}
+		}
+		// Now this server's version check
+		if(file_exists(__DIR__.'/../../'.$types[$type].'/gdps.txt')) $oldVersion = file_get_contents(__DIR__.'/../../'.$types[$type].'/gdps.txt');
+		else {
+			$oldVersion = 0;
+			file_put_contents(__DIR__.'/../../'.$types[$type].'/gdps.txt', $mainServerTime);
+		}
+		
+		$times[] = $mainServerTime;
+		rsort($times);
+		
+		if($oldVersion < $mainServerTime || $updatedLib) self::generateDATFile($times[0], $type);
+	}
+	
+	public static function generateDATFile($mainServerTime, $type = 0) {
+		require __DIR__."/connection.php";
+		require __DIR__."/../../config/dashboard.php";
+		require_once __DIR__."/exploitPatch.php";
+		
+		$library = $servers = $serverIDs = $serverTypes = [];
+		if(!isset($customLibrary)) global $customLibrary;
+		if(empty($customLibrary)) $customLibrary = [[1, 'Geometry Dash', 'https://geometrydashfiles.b-cdn.net', 2], [3, $gdps, null, 2]]; 
+		
+		$types = ['sfx', 'music'];
+		foreach($customLibrary AS $customLib) {
+			if($customLib[2] !== null) {
+				$servers['s'.$customLib[0]] = $customLib[0];
+			}
+			$serverIDs[$customLib[2]] = $customLib[0];
+			if($types[$type] == 'sfx') {
+				if($customLib[3] != 1) $library['folders'][($customLib[0] + 1)] = [
+					'name' => Escape::dat($customLib[1]),
+					'type' => 1,
+					'parent' => 1
+				];
+			} else {
+				if($customLib[3] != 0) $library['tags'][$customLib[0]] = [
+					'ID' => $customLib[0],
+					'name' => Escape::dat($customLib[1]),
+				];
+			}
+		}
+		
+		$idsConverter = file_exists(__DIR__.'/../../'.$types[$type].'/ids.json') ? json_decode(file_get_contents(__DIR__.'/../../'.$types[$type].'/ids.json'), true) : ['count' => ($type == 0 ? count($customLibrary) + 2 : 8000000), 'IDs' => [], 'originalIDs' => []];
+		$skipSFXIDs = file_exists(__DIR__.'/../../config/skipSFXIDs.json') ? json_decode(file_get_contents(__DIR__.'/../../config/skipSFXIDs.json'), true) : [];
+		
+		foreach($servers AS $key => $server) {
+			if(!file_exists(__DIR__.'/../../'.$types[$type].'/'.$key.'.dat')) continue;
+			$res = $bits = null;
+			
+			$res = file_get_contents(__DIR__.'/../../'.$types[$type].'/'.$key.'.dat');
+			$res = mb_convert_encoding($res, 'UTF-8', 'UTF-8');
+			try {
+				$res = Escape::url_base64_decode($res);
+				$res = zlib_decode($res);
+			} catch(Exception $e) {
+				unlink(__DIR__.'/../../'.$types[$type].'/'.$key.'.dat');
+				continue;
+			}
+			
+			$res = explode('|', $res);
+			if(!$type) {
+				// SFX library decoding was made by MigMatos, check their ObeyGDBot! https://obeybd.web.app/
+				for($i = 0; $i < count($res); $i++) {
+					$res[$i] = explode(';', $res[$i]);
+					if($i === 0) {
+						$library['version'] = $mainServerTime;
+						$version = explode(',', $res[0][0]);
+						$version[1] = $mainServerTime;
+						$version = implode(',', $version);
+					}
+					for($j = 1; $j <= count($res[$i]); $j++) {
+						$bits = explode(',', $res[$i][$j]);
+						switch($i) {
+							case 0: // File/Folder
+								if(empty(trim($bits[1])) || empty($bits[0]) || !is_numeric($bits[0])) break;
+								if(empty($idsConverter['originalIDs'][$server][$bits[0]])) {
+									$idsConverter['count']++;
+									while(in_array($idsConverter['count'], $skipSFXIDs)) $idsConverter['count']++;
+									$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $bits[0], 'name' => $bits[1], 'type' => $bits[2]];
+									$idsConverter['originalIDs'][$server][$bits[0]] = $idsConverter['count'];
+									$bits[0] = $idsConverter['count'];
+								} else {
+									$bits[0] = $idsConverter['originalIDs'][$server][$bits[0]];
+									if(!isset($idsConverter['IDs'][$bits[0]]['name'])) $idsConverter['IDs'][$bits[0]] = ['server' => $server, 'ID' => $bits[0], 'name' => $bits[1], 'type' => $bits[2]];
+								}
+								if($bits[3] != 1) {
+									if(empty($idsConverter['originalIDs'][$server][$bits[3]])) {
+										$idsConverter['count']++;
+										while(in_array($idsConverter['count'], $skipSFXIDs)) $idsConverter['count']++;
+										$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $bits[3], 'name' => $bits[1], 'type' => 1];
+										$idsConverter['originalIDs'][$server][$bits[3]] = $idsConverter['count'];
+										$bits[3] = $idsConverter['count'];
+									} else $bits[3] = $idsConverter['originalIDs'][$server][$bits[3]];
+								} else $bits[3] = $server + 1;
+								if($bits[2]) {
+									$library['folders'][$bits[0]] = [
+										'name' => Escape::dat($bits[1]),
+										'type' => (int)$bits[2],
+										'parent' => (int)$bits[3]
+									];
+								} else {
+									$library['files'][$bits[0]] = [
+										'name' => Escape::dat($bits[1]),
+										'type' => (int)$bits[2],
+										'parent' => (int)$bits[3],
+										'bytes' => (int)$bits[4],
+										'milliseconds' => (int)$bits[5],
+									];
+								}
+								break;
+							case 1: // Credit
+								if(empty(trim($bits[0])) || empty(trim($bits[1]))) continue 2;
+								$library['credits'][Escape::dat($bits[0])] = [
+									'name' => Escape::dat($bits[0]),
+									'website' => Escape::dat($bits[1]),
+								];
+								break;
+						}
+					}
+				}
+				$sfxs = $db->prepare("SELECT sfxs.*, accounts.userName FROM sfxs JOIN accounts ON accounts.accountID = sfxs.reuploadID");
+				$sfxs->execute();
+				$sfxs = $sfxs->fetchAll();
+				$folderID = $gdpsLibrary = [];
+				$server = $serverIDs[null];
+				foreach($sfxs AS &$customSFX) {
+					if(!isset($folderID[$customSFX['reuploadID']])) {
+						if(empty($idsConverter['originalIDs'][$server][$customSFX['reuploadID']])) {
+							$idsConverter['count']++;
+							$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $customSFX['ID'], 'name' => $customSFX['userName'].'\'s SFXs', 'type' => 1];
+							$idsConverter['originalIDs'][$server][$customSFX['reuploadID']] = $idsConverter['count'];
+							$newID = $idsConverter['count'];
+						} else $newID = $idsConverter['originalIDs'][$server][$customSFX['reuploadID']];
+						$library['folders'][$newID] = [
+							'name' => Escape::dat($customSFX['userName']).'\'s SFXs',
+							'type' => 1,
+							'parent' => (int)($server + 1)
+						];
+						$gdpsLibrary['folders'][$newID] = [
+							'name' => Escape::dat($customSFX['userName']).'\'s SFXs',
+							'type' => 1,
+							'parent' => 1
+						];
+						$folderID[$customSFX['reuploadID']] = true;
+					}
+					if(empty($idsConverter['originalIDs'][$server][$customSFX['ID'] + 8000000])) {
+						$idsConverter['count']++;
+						$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $customSFX['ID'], 'name' => $customSFX['name'], 'type' => 0];
+						$idsConverter['originalIDs'][$server][$customSFX['ID'] + 8000000] = $idsConverter['count'];
+						$customSFX['ID'] = $idsConverter['count'];
+					} else $customSFX['ID'] = $idsConverter['originalIDs'][$server][$customSFX['ID'] + 8000000];
+					$library['files'][$customSFX['ID']] = $gdpsLibrary['files'][$customSFX['ID']] = [
+						'name' => Escape::dat($customSFX['name']),
+						'type' => 0,
+						'parent' => (int)$idsConverter['originalIDs'][$server][$customSFX['reuploadID']],
+						'bytes' => (int)$customSFX['size'],
+						'milliseconds' => (int)($customSFX['milliseconds'] / 10)
+					];
+				}
+				
+				$filesEncrypted = $creditsEncrypted = [];
+				foreach($library['folders'] AS $id => &$folder) $filesEncrypted[] = implode(',', [$id, $folder['name'], 1, $folder['parent'], 0, 0]);
+				foreach($library['files'] AS $id => &$file) $filesEncrypted[] = implode(',', [$id, $file['name'], 0, $file['parent'], $file['bytes'], $file['milliseconds']]);
+				foreach($library['credits'] AS &$credit) $creditsEncrypted[] = implode(',', [$credit['name'], $credit['website']]);
+				$encrypted = $version.";".implode(';', $filesEncrypted)."|" .implode(';', $creditsEncrypted).';';
+				
+				$filesEncrypted = $creditsEncrypted = [];
+				foreach($gdpsLibrary['folders'] AS $id => &$folder) $filesEncrypted[] = implode(',', [$id, $folder['name'], 1, $folder['parent'], 0, 0]);
+				foreach($gdpsLibrary['files'] AS $id => &$file) $filesEncrypted[] = implode(',', [$id, $file['name'], 0, $file['parent'], $file['bytes'], $file['milliseconds']]);
+				$creditsEncrypted[] = implode(',', [$gdps, $_SERVER['SERVER_NAME']]);
+				$gdpsEncrypted = $version.";".implode(';', $filesEncrypted)."|" .implode(';', $creditsEncrypted).';';
+			} else {
+				$version = $mainServerTime;
+				array_shift($res);
+				$x = 0;
+				foreach($res AS &$data) {
+					$data = rtrim($data, ';');
+					$music = explode(';', $data);
+					foreach($music AS &$songString) {
+						$song = explode(',', $songString);
+						$originalID = $song[0];
+						if(empty($song[0]) || !is_numeric($song[0])) continue;
+						if(empty($idsConverter['originalIDs'][$server][$song[0]])) {
+							$idsConverter['count']++;
+							$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $song[0], 'type' => $x];
+							$idsConverter['originalIDs'][$server][$song[0]] = $idsConverter['count'];
+							$song[0] = $idsConverter['count'];
+						} else $song[0] = $idsConverter['originalIDs'][$server][$song[0]];
+						switch($x) {
+							case 0:
+								$idsConverter['IDs'][$song[0]] = $library['authors'][$song[0]] = [
+									'server' => $server,
+									'type' => $x,
+									'originalID' => $originalID,
+									'authorID' => $song[0],
+									'name' => Escape::dat($song[1]),
+									'link' => Escape::dat($song[2]),
+									'yt' => Escape::dat($song[3])
+								];
+								break;
+							case 1:
+								if(empty($idsConverter['originalIDs'][$server][$song[2]])) {
+									$idsConverter['count']++;
+									$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $song[2], 'type' => $x];
+									$idsConverter['originalIDs'][$server][$song[2]] = $idsConverter['count'];
+									$song[2] = $idsConverter['count'];
+								} else $song[2] = $idsConverter['originalIDs'][$server][$song[2]];
+								$tags = explode('.', $song[5]);
+								$newTags = [];
+								foreach($tags AS &$tag) {
+									if(empty($tag)) continue;
+									if(empty($idsConverter['originalIDs'][$server][$tag])) {
+										$idsConverter['count']++;
+										$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $tag, 'type' => 2];
+										$idsConverter['originalIDs'][$server][$tag] = $idsConverter['count'];
+										$tag = $idsConverter['count'];
+									} else $tag = $idsConverter['originalIDs'][$server][$tag];
+									$newTags[] = $tag;
+								}
+								$newTags[] = $server;
+								$tags = '.'.implode('.', $newTags).'.';
+								$newArtists = [];
+								$artists = explode('.', $song[7]);
+								foreach($artists AS &$artist) {
+									if(empty($artist)) continue;
+									if(empty($idsConverter['originalIDs'][$server][$artist])) {
+										$idsConverter['count']++;
+										$idsConverter['IDs'][$idsConverter['count']] = ['server' => $server, 'ID' => $artist, 'type' => 0];
+										$idsConverter['originalIDs'][$server][$artist] = $idsConverter['count'];
+										$artist = $idsConverter['count'];
+									} else $artist = $idsConverter['originalIDs'][$server][$artist];
+									$newArtists[] = $artist;
+								}
+								$artists = implode('.', $newArtists);
+								$idsConverter['IDs'][$song[0]] = $library['songs'][$song[0]] = [
+									'server' => $server,
+									'type' => $x,
+									'originalID' => $originalID,
+									'ID' => $song[0],
+									'name' => Escape::dat($song[1]),
+									'authorID' => $song[2],
+									'size' => $song[3],
+									'seconds' => $song[4],
+									'tags' => $tags,
+									'ncs' => $song[6] ?: 0,
+									'artists' => $artists,
+									'externalLink' => $song[8] ?: '',
+									'new' => $song[9] ?: 0,
+									'priorityOrder' => $song[10] ?: 0
+								];
+								break;
+							case 2:
+								$idsConverter['IDs'][$song[0]] = $library['tags'][$song[0]] = [
+									'server' => $server,
+									'type' => $x,
+									'originalID' => $originalID,
+									'ID' => $song[0],
+									'name' => Escape::dat($song[1])
+								];
+								break;
+						}
+					}
+					$x++;
+				}
+				$songs = $db->prepare("SELECT songs.*, accounts.userName FROM songs JOIN accounts ON accounts.accountID = songs.reuploadID WHERE isDisabled = 0");
+				$songs->execute();
+				$songs = $songs->fetchAll();
+				$folderID = $accIDs = $gdpsLibrary = [];
+				$c = 100;
+				foreach($songs AS &$customSongs) {
+					$c++;
+					$authorName = trim(Escape::text(Escape::dat(Escape::translit($customSongs['authorName'])), 40));
+					if(empty($authorName)) $authorName = 'Reupload';
+					if(empty($folderID[$authorName])) {
+						$folderID[$authorName] = $c;
+						$library['authors'][$serverIDs[null]. 0 .$folderID[$authorName]] = $gdpsLibrary['authors'][$serverIDs[null]. 0 .$folderID[$authorName]] = [
+							'authorID' => (int)($serverIDs[null]. 0 .$folderID[$authorName]),
+							'name' => $authorName,
+							'link' => ' ',
+							'yt' => ' '
+						];
+					}
+					if(empty($accIDs[$customSongs['reuploadID']])) {
+						$c++;
+						$accIDs[$customSongs['reuploadID']] = $c;
+						$library['tags'][$serverIDs[null]. 0 .$accIDs[$customSongs['reuploadID']]] = $gdpsLibrary['tags'][$serverIDs[null]. 0 .$accIDs[$customSongs['reuploadID']]] = [
+							'ID' => (int)($serverIDs[null]. 0 .$accIDs[$customSongs['reuploadID']]),
+							'name' => Escape::text(Escape::dat($customSongs['userName']), 30),
+						];
+					}
+					$customSongs['name'] = trim(Escape::text(Escape::dat(Escape::translit($customSongs['name'])), 40));
+					$library['songs'][$customSongs['ID']] = $gdpsLibrary['songs'][$customSongs['ID']] = [
+						'ID' => ($customSongs['ID']),
+						'name' => !empty($customSongs['name']) ? $customSongs['name'] : 'Unnamed',
+						'authorID' => (int)($serverIDs[null]. 0 .$folderID[$authorName]),
+						'size' => $customSongs['size'] * 1024 * 1024,
+						'seconds' => $customSongs['duration'],
+						'tags' => '.'.$serverIDs[null].'.'.$serverIDs[null]. 0 .$accIDs[$customSongs['reuploadID']].'.',
+						'ncs' => 0,
+						'artists' => '',
+						'externalLink' => urlencode($customSongs['download']),
+						'new' => ($customSongs['reuploadTime'] > time() - 604800 ? 1 : 0),
+						'priorityOrder' => 0
+					];
+				}
+				$authorsEncrypted = $songsEncrypted = $tagsEncrypted = [];
+				foreach($library['authors'] AS &$authorList) {
+					unset($authorList['server'], $authorList['type'], $authorList['originalID']);
+					$authorsEncrypted[] = implode(',', $authorList);
+				}
+				foreach($library['songs'] AS &$songsList) {
+					unset($songsList['server'], $songsList['type'], $songsList['originalID']);
+					$songsEncrypted[] = implode(',', $songsList);
+				}
+				foreach($library['tags'] AS &$tagsList) {
+					unset($tagsList['server'], $tagsList['type'], $tagsList['originalID']);
+					$tagsEncrypted[] = implode(',', $tagsList);
+				}
+				$encrypted = $version."|".implode(';', $authorsEncrypted).";|" .implode(';', $songsEncrypted).";|" .implode(';', $tagsEncrypted).';';
+				
+				$authorsEncrypted = $songsEncrypted = $tagsEncrypted = [];
+				foreach($gdpsLibrary['authors'] AS &$authorList) {
+					unset($authorList['server'], $authorList['type'], $authorList['originalID']);
+					$authorsEncrypted[] = implode(',', $authorList);
+				}
+				foreach($gdpsLibrary['songs'] AS &$songsList) {
+					unset($songsList['server'], $songsList['type'], $songsList['originalID']);
+					$songsEncrypted[] = implode(',', $songsList);
+				}
+				foreach($gdpsLibrary['tags'] AS &$tagsList) {
+					unset($tagsList['server'], $tagsList['type'], $tagsList['originalID']);
+					$tagsEncrypted[] = implode(',', $tagsList);
+				}
+				$gdpsEncrypted = $version."|".implode(';', $authorsEncrypted).";|" .implode(';', $songsEncrypted).";|" .implode(';', $tagsEncrypted).';';
+			}
+		}
+
+		file_put_contents(__DIR__.'/../../'.$types[$type].'/ids.json', json_encode($idsConverter, JSON_PRETTY_PRINT | JSON_INVALID_UTF8_IGNORE));
+		$encrypted = zlib_encode($encrypted, ZLIB_ENCODING_DEFLATE);
+		$encrypted = Escape::url_base64_encode($encrypted);
+		file_put_contents(__DIR__.'/../../'.$types[$type].'/gdps.dat', $encrypted);
+		
+		$gdpsEncrypted = zlib_encode($gdpsEncrypted, ZLIB_ENCODING_DEFLATE);
+		$gdpsEncrypted = Escape::url_base64_encode($gdpsEncrypted);
+		file_put_contents(__DIR__.'/../../'.$types[$type].'/standalone.dat', $gdpsEncrypted);
+	}
+	
+	public static function lastSongTime() {
+		require __DIR__."/connection.php";
+		
+		$lastSongTime = $db->prepare('SELECT reuploadTime FROM songs WHERE reuploadTime > 0 ORDER BY reuploadTime DESC LIMIT 1');
+		$lastSongTime->execute();
+		$lastSongTime = $lastSongTime->fetchColumn();
+		if(!$lastSongTime) $lastSongTime = 1;
+		
+		return $lastSongTime;
+	}
+	
+	public static function lastSFXTime() {
+		require __DIR__."/connection.php";
+		
+		$lastSongTime = $db->prepare('SELECT reuploadTime FROM sfxs WHERE reuploadTime > 0 ORDER BY reuploadTime DESC LIMIT 1');
+		$lastSongTime->execute();
+		$lastSongTime = $lastSongTime->fetchColumn();
+		if(!$lastSongTime) $lastSongTime = 1;
+		
+		return $lastSongTime;
+	}
+	
 	/*
 		Utils
 	*/
@@ -904,14 +1435,15 @@ class Library {
 		return $randomString;
 	}
 	
-	public static function makeTime($time) {
+	public static function makeTime($time, $extraTextArray = []) {
 		require __DIR__."/../../config/dashboard.php";
 		if(!isset($timeType)) $timeType = 0;
+		$extraText = !empty($extraTextArray) ? implode(", ", $extraTextArray).', ' : '';
 		switch($timeType) {
 			case 1:
-				if(date("d.m.Y", $time) == date("d.m.Y", time())) return date("G;i", $time);
-				elseif(date("Y", $time) == date("Y", time())) return date("d.m", $time);
-				else return date("d.m.Y", $time);
+				if(date("d.m.Y", $time) == date("d.m.Y", time())) return $extraText.date("G;i", $time);
+				elseif(date("Y", $time) == date("Y", time())) return $extraText.date("d.m", $time);
+				else return $extraText.date("d.m.Y", $time);
 				break;
 			case 2:
 				// taken from https://stackoverflow.com/a/36297417
@@ -925,13 +1457,54 @@ class Library {
 				foreach($tokens as $unit => $text) {
 					if($time < $unit) continue;
 					$numberOfUnits = floor($time / $unit);
-					return ($isFuture ? 'in ' : '').$numberOfUnits.' '.$text.(($numberOfUnits > 1) ? 's' : '');
+					return $extraText.($isFuture ? 'in ' : '').$numberOfUnits.' '.$text.(($numberOfUnits > 1) ? 's' : '');
 				}
 				break;
 			default:
-				return date("d/m/Y G.i", $time);
+				return $extraText.date("d/m/Y G.i", $time);
 				break;
 		}
+	}
+	
+	public static function rateItem($accountID, $itemID, $type, $isLike) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$checkIfRated = $db->prepare("SELECT count(*) FROM actions_likes WHERE itemID = :itemID AND type = :type AND (ip = INET6_ATON(:IP) OR accountID = :accountID)");
+		$checkIfRated->execute([':itemID' => $itemID, ':type' => $type, ':IP' => $IP, ':accountID' => $accountID]);
+		$checkIfRated = $checkIfRated->fetchColumn();
+		if($checkIfRated) return false;
+		
+		$rateItemAction = $db->prepare("INSERT INTO actions_likes (itemID, type, isLike, ip, accountID)
+			VALUES (:itemID, :type, :isLike, INET6_ATON(:IP), :accountID)");
+		$rateItemAction->execute([':itemID' => $itemID, ':type' => $type, ':isLike' => $isLike, ':IP' => $IP, ':accountID' => $accountID]);
+		
+		switch($type) {
+			case 1:
+				$table = "levels";
+				$column = "levelID";
+				break;
+			case 2:
+				$table = "comments";
+				$column = "commentID";
+				break;
+			case 3:
+				$table = "acccomments";
+				$column = "commentID";
+				break;
+			case 4:
+				$table = "lists";
+				$column = "listID";
+				break;
+		}
+		$rateColumn = $isLike ? 'likes' : 'dislikes';
+		
+		$rateItem = $db->prepare("UPDATE ".$table." SET ".$rateColumn." = ".$rateColumn." + 1 WHERE ".$column." = :itemID");
+		$rateItem->execute([':itemID' => $itemID]);
+		
+		return true;
 	}
 }
 ?>

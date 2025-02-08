@@ -1,12 +1,11 @@
 <?php
 class Commands {
-	public static function processLevelCommand($comment, $levelID, $accountID) {
+	public static function processLevelCommand($comment, $level, $accountID) {
 		require_once __DIR__.'/mainLib.php';
 		require_once __DIR__.'/exploitPatch.php';
 		if(substr($comment, 0, 1) != '!') return false;
 		
-		$level = Library::getLevelByID($levelID);
-		if(!$level) return false;
+		$levelID = $level['levelID'];
 		$commentSplit = explode(' ', $comment);
 		$increaseSplit = 0;
 		$command = $commentSplit[0];
@@ -172,9 +171,11 @@ class Commands {
 			case '!acc':
 			case '!m':
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
+				if(!$player) return "This user was not found!";
+				
 				if($player['extID'] == $level['extID']) return "User ".$player['userName']." already owns level ".$level['levelName']."!";
 				
-				Library::moveLevel($levelID, $player);
+				Library::moveLevel($levelID, $accountID, $player);
 				
 				return "You successfully moved level ".$level['levelName']." to user ".$player['userName']."!";
 			case '!lockUpdating':
@@ -186,11 +187,119 @@ class Commands {
 					'!unlockUpdating' => 0, '!unlu' => 0
 				];
 				$lockUpdating = $lockUpdatingArray[$command];
+				if($level['updateLocked'] == $lockUpdating) return "Level ".$level['levelName']." is already ".(!$lockUpdating ? 'un' : '')."locked!";
 				
-				$lockLevel = Library::lockUpdatingLevel($levelID, $lockUpdating);
-				if(!$lockLevel) return "Level ".$level['levelName']." is already ".(!$lockUpdating ? 'un' : '')."locked!";
+				Library::lockUpdatingLevel($levelID, $accountID, $lockUpdating);
 				
 				return "You successfully ".(!$lockUpdating ? 'un' : '')."locked level ".$level['levelName']."!";
+			case "!rename":
+			case "!re":
+				unset($commentSplit[0]);
+				$newLevelName = trim(Escape::latin(implode(' ', $commentSplit)));
+				if(!$newLevelName) {
+					return "Incorrect usage!".PHP_EOL
+						."!rename *level name*".PHP_EOL
+						."Example: !rename My cool level";
+				}
+				
+				if($level['levelName'] == $newLevelName) return "Level ".$level['levelName']." already has this name!";
+				
+				Library::renameLevel($levelID, $accountID, $newLevelName);
+				
+				return "You successfully renamed level ".$level['levelName']." to ".$newLevelName."!";
+			case "!password":
+			case "!pass":
+			case "!p":
+				if(!$commentSplit[1] || !is_numeric($commentSplit[1]) || strlen($commentSplit[1]) > 6) {
+					return "Incorrect usage!".PHP_EOL
+						."!password *level password*".PHP_EOL
+						."Example: !password 141412";
+				}
+				
+				$newPassword = sprintf("%06d", Escape::number($commentSplit[1]));
+				
+				if($level['password'] == '1'.$newPassword || $level['password'].'000000' == '1'.$newPassword) return "Level ".$level['levelName']." already has this password!";
+				
+				Library::changeLevelPassword($levelID, $accountID, $newPassword);
+				
+				return "You successfully changed password of level ".$level['levelName'].' to '.$newPassword."!";
+			case "!song":
+			case "!s":
+				$songID = Escape::number($commentSplit[1]);
+				if(!$songID) {
+					return "Incorrect usage!".PHP_EOL
+						."!song *song ID*".PHP_EOL
+						."Example: !song 1967605";
+				}
+				
+				if($level["songID"] == $songID) return "Level ".$level['levelName']." already has this song!";
+				
+				$song = Library::getSongByID($songID);
+				if(!$song) return "This song doesn't exist!";
+				
+				Library::changeLevelSong($levelID, $accountID, $songID);
+				
+				return "You successfully changed song of level ".$level['levelName']." to ".Escape::translit($song['authorName'])." - ".Escape::translit($song['name'])."!";
+			case "!description":
+			case "!desc":
+				unset($commentSplit[0]);
+				$newLevelDesc = trim(Escape::text(implode(' ', $commentSplit)));
+				if(!$newLevelDesc) {
+					return "Incorrect usage!".PHP_EOL
+						."!description *level description*".PHP_EOL
+						."Example: !description This is my cool level i made in 3 hours. Please enjoy!";
+				}
+				
+				if($level['levelDesc'] == $newLevelDesc) return "Level ".$level['levelName']." already has this description!";
+				
+				Library::changeLevelDescription($levelID, $accountID, $newLevelDesc);
+				
+				return "You successfully changed description of level ".$level['levelName']." to:".PHP_EOL
+					.$newLevelDesc;
+			case "!public":
+			case "!unlist":
+			case "!friends":
+			case "!pub":
+			case "!unl":
+			case "!fr":
+				$privacyArray = [
+					'!public' => 0, '!pub' => 0,
+					'!friends' => 1, '!fr' => 1,
+					'!unlist' => 2, '!unl' => 2,
+				];
+				$privacyText = ['public', 'only for friends', 'unlisted'];
+				$privacy = $privacyArray[$command];
+				
+				if($level['unlisted'] == $privacy) return "Level ".$level['levelName']." already is ".$privacyText[$privacy]."!";
+				
+				Library::changeLevelPrivacy($levelID, $accountID, $privacy);
+				
+				return "You successfully made level ".$level['levelName']." ".$privacyText[$privacy]."!";
+			case "!sharecp":
+			case "!cp":
+				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
+				if(!$player) return "This user was not found!";
+				
+				if($player['extID'] == $level['extID']) return "User ".$player['userName']." is creator of level ".$level['levelName']."!";
+				
+				$shareCreatorPoints = Library::shareCreatorPoints($levelID, $accountID, $player['userID']);
+				if(!$shareCreatorPoints) return "User ".$player['userName']." have already been shared Creator Points from level ".$level['levelName']."!";
+				
+				return "You successfully shared Creator Points from level ".$level['levelName']." with user ".$player['userName']."!";
+			case '!lockComments':
+			case '!unlockComments':
+			case '!lc':
+			case '!unlc':
+				$lockCommentingArray = [
+					'!lockComments' => 1, '!lc' => 1,
+					'!unlockComments' => 0, '!unlc' => 0
+				];
+				$lockCommenting = $lockCommentingArray[$command];
+				if($level['commentLocked'] == $lockCommenting) return "Comments on level ".$level['levelName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
+				
+				Library::lockCommentingOnLevel($levelID, $accountID, $lockCommenting);
+				
+				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on level ".$level['levelName']."!";
 		}
 		
 		return "Command ".$command." was not found.";

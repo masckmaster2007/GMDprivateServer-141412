@@ -19,7 +19,6 @@ $levelID = Escape::number($_POST["levelID"]);
 $levelName = Escape::latin($_POST["levelName"]);
 $levelDesc = $gameVersion >= 20 ? Escape::translit(Escape::text(Escape::url_base64_decode($_POST["levelDesc"]))) : Escape::translit(Escape::text($_POST["levelDesc"]));
 $levelDesc = Escape::url_base64_encode(Library::escapeDescriptionCrash($levelDesc));
-$levelVersion = Escape::number($_POST["levelVersion"]);
 $levelLength = Escape::number($_POST["levelLength"]);
 $audioTrack = Escape::number($_POST["audioTrack"]);
 
@@ -62,7 +61,6 @@ $levelDetails = [
 	'gameVersion' => $gameVersion,
 	'binaryVersion' => $binaryVersion,
 	'levelDesc' => $levelDesc,
-	'levelVersion' => $levelVersion,
 	'levelLength' => $levelLength,
 	'audioTrack' => $audioTrack,
 	'auto' => $auto,

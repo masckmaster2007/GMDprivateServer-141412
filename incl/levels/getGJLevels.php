@@ -119,7 +119,13 @@ switch($type) {
 		$order = "likes";
 		if(!empty($str)) {
 			if(is_numeric($str)) {
-				$filters = ["levelID = '".$str."'"];
+				$friendsArray = Library::getFriends($accountID);
+				$friendsArray[] = $accountID;
+				$friendsString = implode(",", $friendsArray);
+				$filters = ["levelID = ".$str." AND (
+					unlisted <> 1 OR
+					(unlisted = 1 AND (extID IN (".$friendsString.")))
+				)"];
 				$isIDSearch = true;
 			} else {
 				$firstCharacter = substr($str, 0, 1);
@@ -198,8 +204,9 @@ switch($type) {
 	case 25: // List levels
 		$listLevels = Library::getListLevels($str);
 		$friendsArray = Library::getFriends($accountID);
+		$friendsArray[] = $accountID;
 		$friendsString = implode(",", $friendsArray);
-		$filters = ["levelID IN (".$listLevels.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")) OR extID = ".$accountID.")"];
+		$filters = ["levelID IN (".$listLevels.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")))"];
 		break;
 	case 27: // Sent levels
 		$queryJoin = "JOIN (SELECT suggestLevelId AS levelID, MAX(suggest.timestamp) AS timestamp FROM suggest GROUP BY levelID) suggest ON levels.levelID = suggest.levelID";

@@ -20,8 +20,15 @@ $percent = Escape::number($_POST['percent']) ?: 0;
 if(empty($comment)) exit(CommonError::InvalidRequest);
 
 if($gameVersion >= 20) $comment = Escape::url_base64_decode($comment);
-$command = Commands::processLevelCommand($comment, $levelID, $accountID);
+
+$level = Library::getLevelByID($levelID);
+if(!$level) exit(CommonError::InvalidRequest);
+
+$command = Commands::processLevelCommand($comment, $level, $accountID);
 if($command) exit(Library::showCommentsBanScreen($command, 0));
+
+if($level['commentLocked']) exit(Library::showCommentsBanScreen("Commenting on this level is currently disabled!", 0));
+
 Library::uploadComment($accountID, $userID, $levelID, $userName, $comment, $percent);
 exit(CommonError::Success); 
 ?>

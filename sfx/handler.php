@@ -1,50 +1,45 @@
 <?php
-require_once "../incl/lib/connection.php";
-require_once "../incl/lib/mainLib.php";
-require "../config/dashboard.php";
-require "../config/proxy.php";
-$gs = new mainLib();
+require __DIR__."/../config/dashboard.php";
+require __DIR__."/../config/proxy.php";
+require_once __DIR__."/../incl/lib/connection.php";
+require_once __DIR__."/../incl/lib/mainLib.php";
 $file = trim($_GET['request']);
 switch($file) {
 	case 'sfxlibrary.dat':
 		$datFile = isset($_GET['dashboard']) ? 'standalone.dat' : 'gdps.dat';
 		if(!file_exists($datFile)) {
-			$time = $db->prepare('SELECT reuploadTime FROM sfxs ORDER BY reuploadTime DESC LIMIT 1');
-			$time->execute();
-			$time = $time->fetchColumn();
-			$gs->updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
+			$time = Library::lastSFXTime();
+			Library::updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
 		}
-		echo file_get_contents($datFile);
-		break;
+		
+		exit(file_get_contents($datFile));
 	case 'sfxlibrary_version.txt': 
-		$time = $db->prepare('SELECT reuploadTime FROM sfxs WHERE reuploadTime > 0 ORDER BY reuploadTime DESC LIMIT 1');
-		$time->execute();
-		$time = $time->fetchColumn();
-		if(!$time) $time = 1;
-		$gs->updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
+		$time = Library::lastSFXTime();
+		
+		Library::updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
+		
 		$times = [];
-		foreach($customLibrary AS $library) {
-			if($library[2] !== null) $times[] = explode(', ', file_get_contents('s'.$library[0].'.txt'))[1];
-		}
+		foreach($customLibrary AS $library) if($library[2] !== null) $times[] = explode(', ', file_get_contents(__DIR__.'s'.$library[0].'.txt'))[1];
 		$times[] = $time;
 		rsort($times);
-		echo $times[0];
-		break;
+		
+		exit((string)$times[0]);
 	default:
 		$servers = [];
 		foreach($customLibrary AS $library) {
 			$servers[$library[0]] = $library[2];
 		}
+		
 		$sfxID = explode('.', substr($file, 1, strlen($file)))[0];
+		
 		if(!file_exists('ids.json')) {
-			$time = $db->prepare('SELECT reuploadTime FROM sfxs ORDER BY reuploadTime DESC LIMIT 1');
-			$time->execute();
-			$time = $time->fetchColumn();
-			$gs->updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
+			$time = Library::lastSFXTime();
+			Library::updateLibraries($_GET['token'], $_GET['expires'], $time, 0);
 		}
-		$song = $gs->getLibrarySongInfo($sfxID, 'sfx');
+		
+		$song = Library::getLibrarySongInfo($sfxID, 'sfx');
+		
 		$url = urldecode($song['download']);
-		header("Location: $url");
-		break;
+		header("Location: ".$url);
 }
 ?>
