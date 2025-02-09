@@ -39,17 +39,21 @@ class Library {
 		
 		self::logAction($accountID, $IP, 1, $userName, $email, $userID);
 
-		// TO-DO: Readd email verification
+		// TO-DO: Re-add email verification
 		
 		return ["success" => true, "accountID" => $accountID, "userID" => $userID];
 	}
 	
 	public static function getAccountByUserName($userName) {
 		require __DIR__."/connection.php";
+
+		if(isset($GLOBALS['core_cache']['accounts']['userName'][$userName])) return $GLOBALS['core_cache']['accounts']['userName'][$userName];
 		
 		$account = $db->prepare("SELECT * FROM accounts WHERE userName LIKE :userName LIMIT 1");
 		$account->execute([':userName' => $userName]);
 		$account = $account->fetch();
+		
+		$GLOBALS['core_cache']['accounts']['userName'][$userName] = $account;
 		
 		return $account;
 	}
@@ -57,9 +61,13 @@ class Library {
 	public static function getAccountByID($accountID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['accounts']['accountID'][$accountID])) return $GLOBALS['core_cache']['accounts']['accountID'][$accountID];
+		
 		$account = $db->prepare("SELECT * FROM accounts WHERE accountID = :accountID");
 		$account->execute([':accountID' => $accountID]);
 		$account = $account->fetch();
+		
+		$GLOBALS['core_cache']['accounts']['accountID'][$accountID] = $account;
 		
 		return $account;
 	}
@@ -67,9 +75,13 @@ class Library {
 	public static function getAccountByEmail($email) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['accounts']['email'][$email])) return $GLOBALS['core_cache']['accounts']['email'][$email];
+		
 		$account = $db->prepare("SELECT * FROM accounts WHERE email LIKE :email ORDER BY registerDate ASC LIMIT 1");
 		$account->execute([':email' => $email]);
 		$account = $account->fetch();
+		
+		$GLOBALS['core_cache']['accounts']['email'][$email] = $account;
 		
 		return $account;
 	}
@@ -90,6 +102,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/ip.php";
 		
+		if(isset($GLOBALS['core_cache']['userID'][$accountID])) return $GLOBALS['core_cache']['userID'][$accountID];
+		
 		$userID = $db->prepare("SELECT userID FROM users WHERE extID = :extID");
 		$userID->execute([':extID' => $accountID]);
 		$userID = $userID->fetchColumn();
@@ -103,15 +117,21 @@ class Library {
 			$userID = self::createUser($userName, $accountID, $IP);
 		}
 		
+		$GLOBALS['core_cache']['userID'][$accountID] = $userID;
+		
 		return $userID;
 	}
 	
 	public static function getAccountID($userID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['accountID']['userID'][$userID])) return $GLOBALS['core_cache']['accountID']['userID'][$userID];
+		
 		$accountID = $db->prepare("SELECT extID FROM users WHERE userID = :userID");
 		$accountID->execute([':userID' => $userID]);
 		$accountID = $accountID->fetchColumn();
+		
+		$GLOBALS['core_cache']['accountID']['userID'][$userID] = $accountID;
 		
 		return $accountID;
 	}
@@ -119,9 +139,13 @@ class Library {
 	public static function getAccountIDWithUserName($userName) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['accountID']['userName'][$userName])) return $GLOBALS['core_cache']['accountID']['userName'][$userName];
+		
 		$accountID = $db->prepare("SELECT accountID FROM accounts WHERE userName LIKE :userName");
 		$accountID->execute([':userName' => $userName]);
 		$accountID = $accountID->fetchColumn();
+		
+		$GLOBALS['core_cache']['accountID']['userName'][$userName] = $accountID;
 		
 		return $accountID;
 	}
@@ -129,9 +153,13 @@ class Library {
 	public static function getUserByID($userID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['user']['userID'][$userID])) return $GLOBALS['core_cache']['user']['userID'][$userID];
+		
 		$user = $db->prepare("SELECT * FROM users WHERE userID = :userID");
 		$user->execute([':userID' => $userID]);
 		$user = $user->fetch();
+		
+		$GLOBALS['core_cache']['user']['userID'][$userID] = $user;
 		
 		return $user;
 	}
@@ -139,9 +167,13 @@ class Library {
 	public static function getUserByUserName($userName) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['user']['userName'][$userName])) return $GLOBALS['core_cache']['user']['userName'][$userName];
+		
 		$user = $db->prepare("SELECT * FROM users WHERE userName LIKE :userName ORDER BY isRegistered DESC LIMIT 1");
 		$user->execute([':userName' => $userName]);
 		$user = $user->fetch();
+		
+		$GLOBALS['core_cache']['user']['userName'][$userName] = $user;
 		
 		return $user;
 	}
@@ -245,12 +277,18 @@ class Library {
 	
 	public static function getUserString($user) {
 		//$user['userName'] = Library::makeClanUsername($user);
-		return $user['userID'].':'.$user["userName"].':'.(is_numeric($user['extID']) ? $user['extID'] : 0);
+		return $user['userID'].':'.$user["userName"].':'.$user['extID'];
 	}
 	
 	public static function isAccountAdmininstrator($accountID) {
+		if(isset($GLOBALS['core_cache']['isAdministrator'][$accountID])) return $GLOBALS['core_cache']['isAdministrator'][$accountID];
+		
 		$account = self::getAccountByID($accountID);
-		return $account['isAdmin'] != 0;
+		$isAdmin = $account['isAdmin'] != 0;
+		
+		$GLOBALS['core_cache']['isAdministrator'][$accountID] = $isAdmin;
+		
+		return $isAdmin;
 	}
 	
 	public static function getCommentsOfUser($userID, $sortMode, $pageOffset) {
@@ -281,6 +319,260 @@ class Library {
 		return true;
 	}
 	
+	public static function getAllBans($onlyActive = true) {
+		require __DIR__."/connection.php";
+		
+		$bans = $db->prepare('SELECT * FROM bans'.($onlyActive ? ' AND isActive = 1' : '').' ORDER BY timestamp DESC');
+		$bans->execute();
+		$bans = $bans->fetchAll();
+		
+		return $bans;
+	}
+	
+	public static function getAllBansFromPerson($person, $personType, $onlyActive = true) {
+		require __DIR__."/connection.php";
+		
+		$bans = $db->prepare('SELECT * FROM bans WHERE person = :person AND personType = :personType'.($onlyActive ? ' AND isActive = 1' : '').' ORDER BY timestamp DESC');
+		$bans->execute([':person' => $person, ':personType' => $personType]);
+		$bans = $bans->fetchAll();
+		
+		return $bans;
+	}
+	
+	public static function getAllBansOfPersonType($personType, $onlyActive = true) {
+		require __DIR__."/connection.php";
+		
+		$bans = $db->prepare('SELECT * FROM bans WHERE personType = :personType'.($onlyActive ? ' AND isActive = 1' : '').' ORDER BY timestamp DESC');
+		$bans->execute([':personType' => $personType]);
+		$bans = $bans->fetchAll();
+		
+		return $bans;
+	}
+	
+	public static function getAllBansOfBanType($banType, $onlyActive = true) {
+		require __DIR__."/connection.php";
+		
+		$bans = $db->prepare('SELECT * FROM bans WHERE banType = :banType'.($onlyActive ? ' AND isActive = 1' : '').' ORDER BY timestamp DESC');
+		$bans->execute([':banType' => $banType]);
+		$bans = $bans->fetchAll();
+		
+		return $bans;
+	}
+	
+	public static function banPerson($modID, $person, $reason, $banType, $personType, $expires) {
+		require __DIR__."/connection.php";
+		
+		if($banType == 4) {
+			switch($personType) {
+				case 0:
+					$removeAuth = $db->prepare('UPDATE accounts SET auth = "none" WHERE accountID = :accountID');
+					$removeAuth->execute([':accountID' => $person]);
+					break;
+				case 2:
+					$banIP = $db->prepare("INSERT INTO bannedips (IP) VALUES (:IP)");
+					$banIP->execute([':IP' => $person]);
+					break;
+			}
+		}
+		
+		if($personType == 2) $person = self::IPForBan($person);
+		
+		$check = self::getBan($person, $personType, $banType);
+		if($check) {
+			if($check['expires'] <= $expires) return $check['banID'];
+			self::unbanPerson($check['banID'], $modID);
+		}
+		
+		$reason = base64_encode($reason);
+		$ban = $db->prepare('INSERT INTO bans (modID, person, reason, banType, personType, expires, timestamp) VALUES (:modID, :person, :reason, :banType, :personType, :expires, :timestamp)');
+		$ban->execute([':modID' => $modID, ':person' => $person, ':reason' => $reason, ':banType' => $banType, ':personType' => $personType, ':expires' => $expires, ':timestamp' => ($modID != 0 ? time() : 0)]);
+		$banID = $db->lastInsertId();
+		
+		if($modID != 0) {
+			$query = $db->prepare("INSERT INTO modactions (type, value, value2, value3, value4, value5, value6, timestamp, account) VALUES ('28', :value, :value2, :value3, :value4, :value5, :value6, :timestamp, :account)");
+			$query->execute([':value' => $person, ':value2' => $reason, ':value3' => $personType, ':value4' => $banType, ':value5' => $expires, ':value6' => 1, ':timestamp' => time(), ':account' => $_SESSION['accountID']]);
+			//$this->sendBanWebhook($banID, $modID);
+		}
+		
+		return $banID;
+	}
+	
+	public static function getBan($person, $personType, $banType) {
+		require __DIR__."/connection.php";
+		
+		$ban = $db->prepare('SELECT * FROM bans WHERE person = :person AND personType = :personType AND banType = :banType AND isActive = 1 ORDER BY timestamp DESC');
+		$ban->execute([':person' => $person, ':personType' => $personType, ':banType' => $banType]);
+		$ban = $ban->fetch();
+		
+		return $ban;
+	}
+	
+	public static function unbanPerson($banID, $modID) {
+		require __DIR__."/connection.php";
+		
+		$ban = self::getBanByID($banID);
+		if(!$ban) return false;
+		
+		if($ban['personType'] == 2 && $ban['banType'] == 4) {
+			$banIP = $db->prepare("DELETE FROM bannedips WHERE IP = :IP");
+			$banIP->execute([':IP' => $ban['person']]);
+		}
+		
+		$unban = $db->prepare('UPDATE bans SET isActive = 0 WHERE banID = :banID');
+		$unban->execute([':banID' => $banID]);
+		if($modID != 0) {
+			$query = $db->prepare("INSERT INTO modactions (type, value, value2, value3, value4, value5, value6, timestamp, account) VALUES ('28', :value, :value2, :value3, :value4, :value5, :value6, :timestamp, :account)");
+			$query->execute([':value' => $ban['person'], ':value2' => $ban['reason'], ':value3' => $ban['personType'], ':value4' => $ban['banType'], ':value5' => $ban['expires'], ':value6' => 0, ':timestamp' => time(), ':account' => $modID]);
+			//$this->sendBanWebhook($banID, $modID);
+		}
+		
+		return true;
+	}
+	
+	public static function getBanByID($banID) {
+		require __DIR__."/connection.php";
+		
+		$ban = $db->prepare('SELECT * FROM bans WHERE banID = :banID');
+		$ban->execute([':banID' => $banID]);
+		$ban = $ban->fetch();
+		
+		return $ban;
+	}
+	
+	public static function getPersonBan($accountID, $userID, $banType, $IP = false) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = $IP ? self::IPForBan($IP) : self::IPForBan(IP::getIP());
+		$ban = $db->prepare('SELECT * FROM bans WHERE ((person = :accountID AND personType = 0) OR (person = :userID AND personType = 1) OR (person = :IP AND personType = 2)) AND banType = :banType AND isActive = 1 ORDER BY expires DESC');
+		$ban->execute([':accountID' => $accountID, ':userID' => $userID, ':IP' => $IP, ':banType' => $banType]);
+		$ban = $ban->fetch();
+		
+		return $ban;
+	}
+	
+	public static function IPForBan($IP, $isSearch = false) {
+		$IP = explode('.', $IP);
+		return $IP[0].'.'.$IP[1].'.'.$IP[2].($isSearch ? '' : '.0');
+	}
+	
+	public static function changeBan($banID, $modID, $reason, $expires) {
+		require __DIR__."/connection.php";
+		
+		$ban = self::getBanByID($banID);
+		$reason = base64_encode($reason);
+		if($ban && $ban['isActive'] != 0) {
+			$unban = $db->prepare('UPDATE bans SET reason = :reason, expires = :expires WHERE banID = :banID');
+			$unban->execute([':banID' => $banID, ':reason' => $reason, ':expires' => $expires]);
+			
+			$query = $db->prepare("INSERT INTO modactions (type, value, value2, value3, value4, value5, value6, timestamp, account) VALUES ('28', :value, :value2, :value3, :value4, :value5, :value6, :timestamp, :account)");
+			$query->execute([':value' => $ban['person'], ':value2' => $reason, ':value3' => $ban['personType'], ':value4' => $ban['banType'], ':value5' => $expires, ':value6' => 2, ':timestamp' => time(), ':account' => $modID]);
+			//$this->sendBanWebhook($banID, $modID);
+			
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public static function getPersonRoles($person) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['roles'][$person['accountID']])) return $GLOBALS['core_cache']['roles'][$person['accountID']];
+		
+		$roleIDs = [];
+		
+		$getRoleID = $db->prepare("SELECT roleID FROM roleassign WHERE (person = :accountID AND personType = 0) OR (person = :userID AND personType = 1) OR (person REGEXP :IP AND personType = 2)");
+		$getRoleID->execute([':accountID' => $person['accountID'], ':userID' => $person['userID'], ':IP' => self::IPForBan($person['IP'], true)]);
+		$getRoleID = $getRoleID->fetchAll();
+		
+		foreach($getRoleID AS &$roleID) $roleIDs[] = $roleID['roleID'];
+		$roleIDs[] = 0;
+		
+		$getRoles = $db->prepare("SELECT * FROM roles WHERE roleID IN (".implode(',', $roleIDs).") OR isDefault != 0 ORDER BY priority DESC, isDefault ASC");
+		$getRoles->execute();
+		$getRoles = $getRoles->fetchAll();
+		
+		$GLOBALS['core_cache']['roles'][$person['accountID']] = $getRoles;
+		
+		return $getRoles;
+	}
+	
+	public static function checkPermission($person, $permission) {
+		if(isset($GLOBALS['core_cache']['permissions'][$permission][$person['accountID']])) return $GLOBALS['core_cache']['permissions'][$permission][$person['accountID']];
+		
+		$isAdmin = self::isAccountAdmininstrator($person['accountID']);
+		if($isAdmin) {
+			$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = true;
+			return true;
+		}
+		
+		$getRoles = self::getPersonRoles($person);
+		if(!$getRoles) {
+			$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = false;
+			return false;
+		}
+		
+		foreach($getRoles AS &$role) {
+			if(!isset($role[$permission])) return false;
+			
+			switch($role[$permission]) {
+				case 1:
+					$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = true;
+					return true;
+				case 2:
+					$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = false;
+					return false;
+			}	
+		}
+		
+		$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = false;
+		return false;
+	}
+	
+	public static function getDailyChests($userID) {
+		require __DIR__."/connection.php";
+		
+		$getTime = $db->prepare("SELECT chest1time, chest2time, chest1count, chest2count FROM users WHERE userID = :userID");
+		$getTime->execute([':userID' => $userID]);
+		$getTime = $getTime->fetch();
+		
+		return $getTime;
+	}
+	
+	public static function retrieveDailyChest($userID, $rewardType) {
+		require __DIR__."/connection.php";
+		
+		$retrieveChest = $db->prepare("UPDATE users SET chest".$rewardType."time = :time, chest".$rewardType."count = chest".$rewardType."count + 1 WHERE userID = :userID");
+		$retrieveChest->execute([':userID' => $userID, ':time' => time()]);
+		
+		return true;
+	}
+	
+	public static function getPersonCommentAppearance($person) {
+		if(isset($GLOBALS['core_cache']['roleAppearance'][$person['accountID']])) return $GLOBALS['core_cache']['roleAppearance'][$person['accountID']];
+		
+		$getRoles = self::getPersonRoles($person);
+		
+		if(!$getRoles) {
+			$roleAppearance = [
+				'commentsExtraText' => '',
+				'modBadgeLevel' => 0,
+				'commentColor' => '255,255,255'
+			];
+		} else {		
+			$roleAppearance = [
+				'commentsExtraText' => $getRoles[0]['commentsExtraText'],
+				'modBadgeLevel' => $getRoles[0]['modBadgeLevel'],
+				'commentColor' => $getRoles[0]['commentColor']
+			];
+		}
+		
+		$GLOBALS['core_cache']['roleAppearance'][$person['accountID']] = $roleAppearance;
+		
+		return $roleAppearance;
+	}
+	
 	/*
 		Levels-related functions
 	*/
@@ -300,6 +592,9 @@ class Library {
 	public static function isAbleToUploadLevel($accountID, $userID, $IP) {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/security.php";
+		
+		$checkBan = self::getPersonBan($accountID, $userID, 2, $IP);
+		if($checkBan) return ["success" => false, "error" => CommonError::Banned];
 		
 		$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time');
 		$lastUploadedLevel->execute([':time' => time() - $globalLevelsUploadDelay]);
@@ -383,9 +678,13 @@ class Library {
 	public static function getGauntletByID($gauntletID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['gauntlets'][$gauntletID])) return $GLOBALS['core_cache']['gauntlets'][$gauntletID];
+		
 		$gauntlet = $db->prepare("SELECT * FROM gauntlets WHERE ID = :gauntletID");
 		$gauntlet->execute([':gauntletID' => $gauntletID]);
 		$gauntlet = $gauntlet->fetch();
+		
+		$GLOBALS['core_cache']['gauntlets'][$gauntletID] = $gauntlet;
 		
 		return $gauntlet;
 	}
@@ -433,9 +732,13 @@ class Library {
 	public static function getLevelByID($levelID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['levels'][$levelID])) return $GLOBALS['core_cache']['levels'][$levelID];
+		
 		$level = $db->prepare('SELECT * FROM levels WHERE levelID = :levelID');
 		$level->execute([':levelID' => $levelID]);
 		$level = $level->fetch();
+		
+		$GLOBALS['core_cache']['levels'][$levelID] = $level;
 		
 		return $level;
 	}
@@ -586,7 +889,7 @@ class Library {
 				return "medium demon";
 			case $difficulty >= 6.5:
 				return "easy demon";
-			case $difficulty >= 5.5 && $difficulty < 6.5:
+			case $difficulty >= 5.5:
 				return "hard demon";
 			case $difficulty >= 4.5:
 				return "insane";
@@ -701,7 +1004,7 @@ class Library {
 		
 		$time = time();
 		
-		$eventTime = $db->prepare("SELECT duration FROM events WHERE timestamp < :time OR duration >= :duration ORDER BY duration DESC LIMIT 1");
+		$eventTime = $db->prepare("SELECT duration FROM events WHERE timestamp < :time AND duration >= :duration ORDER BY duration DESC LIMIT 1");
 		$eventTime->execute([':time' => $time, ':duration' => $time + $duration]);
 		$eventTime = $eventTime->fetchColumn();
 		
@@ -868,6 +1171,21 @@ class Library {
 		return true;
 	}
 	
+	public static function isAbleToComment($levelID, $accountID, $userID, $IP) {
+		require __DIR__."/connection.php";
+		require __DIR__."/../../config/security.php";
+		
+		$checkBan = self::getPersonBan($accountID, $userID, 3, $IP);
+		if($checkBan) return ["success" => false, "error" => CommonError::Banned, "info" => $checkBan];
+
+		$level = self::getLevelByID($levelID);
+		if($level['commentLocked']) return ["success" => false, "error" => CommonError::Disabled];
+		
+		// Automod here
+		
+		return ["success" => true];
+	}
+	
 	/*
 		Lists-related functions
 	*/
@@ -875,10 +1193,14 @@ class Library {
 	public static function getListLevels($listID) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['listLevels'][$listID])) return $GLOBALS['core_cache']['listLevels'][$listID];
+		
 		$listLevels = $db->prepare('SELECT listlevels FROM lists WHERE listID = :listID');
 		$listLevels->execute([':listID' => $listID]);
 		$listLevels = $listLevels->fetchColumn();
 		
+		$GLOBALS['core_cache']['listLevels'][$listID] = $listLevels;
+
 		return $listLevels;
 	}
 	
@@ -889,17 +1211,30 @@ class Library {
 	public static function getSongByID($songID, $column = "*", $library = false) {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['songs'][$songID])) {
+			if($column != "*" && $GLOBALS['core_cache']['songs'][$songID]) return $GLOBALS['core_cache']['songs'][$songID][$column];
+			
+			return $GLOBALS['core_cache']['songs'][$songID];
+		}
+		
 		$isLocalSong = true;
 		
-		$song = $db->prepare("SELECT $column FROM songs WHERE ID = :songID");
+		$song = $db->prepare("SELECT * FROM songs WHERE ID = :songID");
 		$song->execute([':songID' => $songID]);
 		$song = $song->fetch();
 		
-		if(empty($song)) {
+		if(!$song) {
 			$song = self::getLibrarySongInfo($songID, 'music', $library);
-			if(!$song) return false;
 			$isLocalSong = false;
 		}
+		
+		if(!$song) {
+			$GLOBALS['core_cache']['songs'][$songID] = false;			
+			return false;
+		}
+
+		$song['isLocalSong'] = $isLocalSong;
+		$GLOBALS['core_cache']['songs'][$songID] = $song;		
 		
 		if($column != "*") return $song[$column];
 		else return array("isLocalSong" => $isLocalSong, "ID" => $song["ID"], "name" => $song["name"], "authorName" => $song["authorName"], "size" => $song["size"], "duration" => $song["duration"], "download" => $song["download"], "reuploadTime" => $song["reuploadTime"], "reuploadID" => $song["reuploadID"]);
@@ -908,9 +1243,18 @@ class Library {
 	public static function getSFXByID($sfxID, $column = "*") {
 		require __DIR__."/connection.php";
 		
+		if(isset($GLOBALS['core_cache']['sfxs'][$sfxID])) {
+			if($column != "*" && $GLOBALS['core_cache']['sfxs'][$sfxID]) return $GLOBALS['core_cache']['sfxs'][$sfxID][$column];
+			
+			return $GLOBALS['core_cache']['sfxs'][$sfxID];
+		}
+		
 		$sfx = $db->prepare("SELECT $column FROM sfxs WHERE ID = :sfxID");
 		$sfx->execute([':sfxID' => $sfxID]);
 		$sfx = $sfx->fetch();
+		
+		$GLOBALS['core_cache']['sfxs'][$sfxID] = $sfx;
+		
 		if(empty($sfx)) return false;
 		
 		if($column != "*") return $sfx[$column];

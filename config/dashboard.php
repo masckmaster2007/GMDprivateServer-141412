@@ -92,10 +92,10 @@ $thirdParty[] = ['https://avatars.githubusercontent.com/u/52624723', 'Foxodever'
 		1 — only music library
 		1 — both
 */
-$customLibrary[] = array(1, 'Geometry Dash', 'https://geometrydashfiles.b-cdn.net', 2); 
-$customLibrary[] = array(2, 'GDPSFH', 'https://sfx.fhgdps.com', 0); 
-$customLibrary[] = array(3, $gdps, null, 2); // Your GDPS's library, don't remove it
-$customLibrary[] = array(4, 'Song File Hub', 'https://api.songfilehub.com', 1);
+$customLibrary[] = [1, 'Geometry Dash', 'https://geometrydashfiles.b-cdn.net', 2]; 
+$customLibrary[] = [2, 'GDPSFH', 'https://sfx.fhgdps.com', 0]; 
+$customLibrary[] = [3, $gdps, null, 2]; // Your GDPS's library, don't remove it
+$customLibrary[] = [4, 'Song File Hub', 'https://api.songfilehub.com', 1];
 
 /*
 	SFX converter API's

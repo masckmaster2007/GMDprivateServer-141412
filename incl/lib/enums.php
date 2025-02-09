@@ -45,8 +45,12 @@ class BackupError {
 
 class CommonError {
 	const Success = "1";
+	
 	const InvalidRequest = "-1";
 	const SubmitRestoreInfo = "-9";
+	
+	const Banned = "-10";
+	const Disabled = "-2";
 }
 
 class LevelUploadError {
@@ -54,7 +58,6 @@ class LevelUploadError {
 
 	const UploadingDisabled = "-2";
 	const TooFast = "-3";
-	const Banned = "-4";
 	
 	const FailedToWriteLevel = "-5";
 }

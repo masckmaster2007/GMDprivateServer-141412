@@ -1,8 +1,9 @@
 <?php
 if(!isset($db)) global $db;
+
 require __DIR__."/../../config/dashboard.php";
 require_once __DIR__."/mainLib.php";
-$lib = new Library();
+
 if(!$installed) {
 	$check = $db->query("SHOW TABLES LIKE 'replies'");
     	$exist = $check->fetchAll();
@@ -20,6 +21,12 @@ if(!$installed) {
 	$check = $db->query("SHOW TABLES LIKE 'dlsubmits'");
     	$exist = $check->fetchAll();
     	if(!empty($exist)) $db->query("DROP TABLE `dlsubmits`");
+	$check = $db->query("SHOW TABLES LIKE 'modipperms'");
+    	$exist = $check->fetchAll();
+    	if(!empty($exist)) $db->query("DROP TABLE `modipperms`");
+	$check = $db->query("SHOW TABLES LIKE 'modips'");
+    	$exist = $check->fetchAll();
+    	if(!empty($exist)) $db->query("DROP TABLE `modips`");
 	$check = $db->query("SHOW TABLES LIKE 'favsongs'");
     	$exist = $check->fetchAll();
     	if(empty($exist)) $db->query("CREATE TABLE `favsongs` (
@@ -188,16 +195,16 @@ if(!$installed) {
 				if($ban['banReason'] == 'none' || $ban['banReason'] == 'banned') $ban['banReason'] = ''; 
 				switch(true) {
 					case $ban['isBanned'] > 0:
-						//$gs->banPerson(0, $ban['userID'], $ban['banReason'], 0, 1, 2147483647);
+						Library::banPerson(0, $ban['userID'], $ban['banReason'], 0, 1, 2147483647);
 						break;
 					case $ban['isCreatorBanned'] > 0:
-						//$gs->banPerson(0, $ban['userID'], $ban['banReason'], 1, 1, 2147483647);
+						Library::banPerson(0, $ban['userID'], $ban['banReason'], 1, 1, 2147483647);
 						break;
 					case $ban['isUploadBanned'] > 0:
-						//$gs->banPerson(0, $ban['userID'], $ban['banReason'], 2, 1, 2147483647);
+						Library::banPerson(0, $ban['userID'], $ban['banReason'], 2, 1, 2147483647);
 						break;
 					case $ban['isCommentBanned'] > 0:
-						//$gs->banPerson(0, $ban['userID'], $ban['banReason'], 3, 1, 2147483647);
+						Library::banPerson(0, $ban['userID'], $ban['banReason'], 3, 1, 2147483647);
 						break;
 				}
 			}
@@ -232,15 +239,9 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `lists` LIKE 'commentLocked'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `lists` ADD `commentLocked` INT NOT NULL DEFAULT '0' AFTER `unlisted`");
-	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandLockCommentsOwn'");
-		$exist = $check->fetchAll();
-		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandLockCommentsOwn` INT NOT NULL DEFAULT '1' AFTER `commandSongAll`");
-	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandLockCommentsAll'");
-		$exist = $check->fetchAll();
-		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandLockCommentsAll` INT NOT NULL DEFAULT '0' AFTER `commandLockCommentsOwn`");
 	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandLockUpdating'");
 		$exist = $check->fetchAll();
-		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandLockUpdating` INT NOT NULL DEFAULT '0' AFTER `commandLockCommentsAll`");
+		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandLockUpdating` INT NOT NULL DEFAULT '0' AFTER `commandLockComments`");
 	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'dashboardDeleteLeaderboards'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `dashboardDeleteLeaderboards` INT NOT NULL DEFAULT '0' AFTER `dashboardForceChangePassNick`");
@@ -343,6 +344,94 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `comments` LIKE 'userName'");
 		$exist = $check->fetchAll();
 		if(!empty($exist)) $db->query("ALTER TABLE `comments` DROP `userName`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandRenameOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandRenameOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandRenameAll` `commandRename` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandPassOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandPassOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandPassAll` `commandPass` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandDescriptionOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandDescriptionOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandDescriptionAll` `commandDescription` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandPublicOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandPublicOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandPublicAll` `commandPublic` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandUnlistOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandUnlistOwn`");
+			$db->query("ALTER TABLE `roles` DROP `commandUnlistAll`");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandSharecpOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandSharecpOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandSharecpAll` `commandSharecp` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandSongOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandSongOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandSongAll` `commandSong` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandLockCommentsOwn'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) {
+			$db->query("ALTER TABLE `roles` DROP `commandLockCommentsOwn`");
+			$db->query("ALTER TABLE `roles` CHANGE `commandLockCommentsAll` `commandLockComments` INT NOT NULL DEFAULT '0'");
+		}
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandLockComments'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandLockComments` INT NOT NULL DEFAULT '0' AFTER `commandSong`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'actionRequestMod'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `actionRequestMod`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'toolLeaderboardsban'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `toolLeaderboardsban`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'toolQuestsCreate'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `toolQuestsCreate`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'toolModactions'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `toolModactions`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'toolSuggestlist'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `toolSuggestlist`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'modipCategory'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `modipCategory`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commentsExtraText'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commentsExtraText` VARCHAR(255) NOT NULL DEFAULT '' AFTER `roleName`");
+	$check = $db->query("SHOW COLUMNS FROM `roleassign` LIKE 'accountID'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roleassign` CHANGE `accountID` `person` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `roleassign` LIKE 'personType'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `roleassign` ADD `personType` INT NOT NULL DEFAULT '0' AFTER `person`");
+	$db->query("ALTER TABLE `modactions` CHANGE `value3` `value3` VARCHAR(255) NOT NULL DEFAULT ''");
+	$db->query("ALTER TABLE `modactions` CHANGE `value5` `value5` VARCHAR(255) NOT NULL DEFAULT ''");
+	$db->query("ALTER TABLE `modactions` CHANGE `value6` `value6` VARCHAR(255) NOT NULL DEFAULT ''");
+	$db->query("ALTER TABLE `modactions` CHANGE `account` `account` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandUnepic'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `roles` DROP `commandUnepic`");
+	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandSuggest'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandSuggest` INT NOT NULL DEFAULT '0' AFTER `commandEvent`");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

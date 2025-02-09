@@ -1,17 +1,23 @@
 <?php
 class Commands {
-	public static function processLevelCommand($comment, $level, $accountID) {
+	public static function processLevelCommand($comment, $level, $person) {
 		require_once __DIR__.'/mainLib.php';
 		require_once __DIR__.'/exploitPatch.php';
+		
 		if(substr($comment, 0, 1) != '!') return false;
 		
+		$accountID = $person['accountID'];
 		$levelID = $level['levelID'];
+		
 		$commentSplit = explode(' ', $comment);
 		$increaseSplit = 0;
 		$command = $commentSplit[0];
+		
 		switch($command) {
 			case '!rate':
 			case '!r':
+				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+
 				$difficulty = Escape::latin($commentSplit[1]);
 				if(!is_numeric($commentSplit[2])) {
 					$increaseSplit++;
@@ -21,19 +27,21 @@ class Commands {
 				$verifyCoins = Escape::number($commentSplit[3 + $increaseSplit]);
 				$featured = Escape::number($commentSplit[4 + $increaseSplit]);
 				
-				if(!$stars) return "To unrate level please use !unrate.";
-				
 				if(!$difficulty || !is_numeric($stars) || !is_numeric($verifyCoins) || !is_numeric($featured)) {
 					return "Incorrect usage!".PHP_EOL
 						."!rate *difficulty* *stars* *are coins verified* *featured/epic/legendary/mythic*".PHP_EOL
 						."Example: !rate harder 7 1 4";
 				}
+
+				if(!$stars) return "To unrate level please use !unrate.";
 				
 				$rateLevel = Library::rateLevel($levelID, $accountID, $difficulty, $stars, $verifyCoins, $featured);
 				
 				return "You successfully rated ".$level['levelName'].' as '.$rateLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
 			case '!unrate':
 			case '!unr':
+				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				
 				Library::rateLevel($levelID, $accountID, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), 0, 0, 0);
 				
 				return "You successfully unrated ".$level['levelName'].'!';
@@ -54,6 +62,7 @@ class Commands {
 			case '!unepi':
 			case '!unleg':
 			case '!unmyt':
+			
 				$commandArray = [
 					'!feature' => 1, '!fea' => 1, '!f' => 1,
 					'!epic' => 2, '!epi' => 2,
@@ -67,6 +76,9 @@ class Commands {
 				$returnTextArray = ['unfeatured level %1$s!', 'featured level %1$s!', 'set level %1$s as epic!', 'set level %1$s as legendary!', 'set level %1$s as mythic!'];
 				$featured = $commandArray[$command];
 				
+				$featurePermission = $featured < 2 && $level['starEpic'] == 0 ? 'Feature' : 'Epic';
+				if(!Library::checkPermission($person, 'command'.$featurePermission)) return "You don't have permissions to use command ".$command."!";
+				
 				Library::rateLevel($levelID, $accountID, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), $level['starStars'], $level['starCoins'], $featured);
 				
 				return "You successfully ".sprintf($returnTextArray[$featured], $level['levelName']);
@@ -74,6 +86,8 @@ class Commands {
 			case '!unverifycoins':
 			case '!vc':
 			case '!unvc':
+				if(!Library::checkPermission($person, 'commandVerifycoins')) return "You don't have permissions to use command ".$command."!";
+			
 				$commandArray = [
 					'!verifycoins' => 1, '!vc' => 1,
 					'!unverifycoins' => 0, '!unvc' => 0
@@ -97,6 +111,9 @@ class Commands {
 				];
 				$type = $typeArray[$command];
 				
+				$dailyPermission = $type ? 'Weekly' : 'Daily';
+				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
+				
 				$setDaily = Library::setLevelAsDaily($levelID, $accountID, $type);
 				if(!$setDaily) return "Level ".$level['levelName']." is already ".($type ? 'weekly' : 'daily')."!";
 				
@@ -112,12 +129,17 @@ class Commands {
 				];
 				$type = $typeArray[$command];
 				
+				$dailyPermission = $type ? 'Weekly' : 'Daily';
+				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
+				
 				$removeDaily = Library::removeDailyLevel($levelID, $accountID, $type);
 				if(!$removeDaily) return "Level ".$level['levelName']." is not ".($type ? 'weekly' : 'daily')." level!";
 				
 				return "You successfully removed level ".$level['levelName']." from ".($type ? 'weekly' : 'daily')." levels!";
 			case '!event':
 			case '!ev':
+				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
+			
 				if(!is_numeric($commentSplit[1])) {
 					return "Incorrect usage!".PHP_EOL
 						."!event *duration in minutes* *reward type* *reward amount*".PHP_EOL
@@ -140,12 +162,16 @@ class Commands {
 					."It will appear ".Library::makeTime($setEvent).'.';
 			case "!unevent":
 			case "!unev":
+				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
+
 				$removeEvent = Library::removeEventLevel($levelID, $accountID);
 				if(!$removeEvent) return "Level ".$level['levelName']." is not event level!";
 				
 				return "You successfully removed level ".$level['levelName']." from event levels!";
 			case '!send':
 			case '!suggest':
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+			
 				$difficulty = Escape::latin($commentSplit[1]);
 				if(!is_numeric($commentSplit[2])) {
 					$increaseSplit++;
@@ -170,6 +196,8 @@ class Commands {
 			case '!sa':
 			case '!acc':
 			case '!m':
+				if(!Library::checkPermission($person, 'commandSetacc')) return "You don't have permissions to use command ".$command."!";
+			
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
 				if(!$player) return "This user was not found!";
 				
@@ -182,6 +210,8 @@ class Commands {
 			case '!unlockUpdating':
 			case '!lu':
 			case '!unlu':
+				if(!Library::checkPermission($person, 'commandLockUpdating')) return "You don't have permissions to use command ".$command."!";
+			
 				$lockUpdatingArray = [
 					'!lockUpdating' => 1, '!lu' => 1,
 					'!unlockUpdating' => 0, '!unlu' => 0
@@ -194,6 +224,8 @@ class Commands {
 				return "You successfully ".(!$lockUpdating ? 'un' : '')."locked level ".$level['levelName']."!";
 			case "!rename":
 			case "!re":
+				if(!Library::checkPermission($person, 'commandRename')) return "You don't have permissions to use command ".$command."!";
+			
 				unset($commentSplit[0]);
 				$newLevelName = trim(Escape::latin(implode(' ', $commentSplit)));
 				if(!$newLevelName) {
@@ -210,6 +242,8 @@ class Commands {
 			case "!password":
 			case "!pass":
 			case "!p":
+				if(!Library::checkPermission($person, 'commandPass')) return "You don't have permissions to use command ".$command."!";
+				
 				if(!$commentSplit[1] || !is_numeric($commentSplit[1]) || strlen($commentSplit[1]) > 6) {
 					return "Incorrect usage!".PHP_EOL
 						."!password *level password*".PHP_EOL
@@ -225,6 +259,8 @@ class Commands {
 				return "You successfully changed password of level ".$level['levelName'].' to '.$newPassword."!";
 			case "!song":
 			case "!s":
+				if(!Library::checkPermission($person, 'commandSong')) return "You don't have permissions to use command ".$command."!";
+			
 				$songID = Escape::number($commentSplit[1]);
 				if(!$songID) {
 					return "Incorrect usage!".PHP_EOL
@@ -242,6 +278,8 @@ class Commands {
 				return "You successfully changed song of level ".$level['levelName']." to ".Escape::translit($song['authorName'])." - ".Escape::translit($song['name'])."!";
 			case "!description":
 			case "!desc":
+				if(!Library::checkPermission($person, 'commandDescription')) return "You don't have permissions to use command ".$command."!";
+			
 				unset($commentSplit[0]);
 				$newLevelDesc = trim(Escape::text(implode(' ', $commentSplit)));
 				if(!$newLevelDesc) {
@@ -262,6 +300,8 @@ class Commands {
 			case "!pub":
 			case "!unl":
 			case "!fr":
+				if(!Library::checkPermission($person, 'commandPublic')) return "You don't have permissions to use command ".$command."!";
+			
 				$privacyArray = [
 					'!public' => 0, '!pub' => 0,
 					'!friends' => 1, '!fr' => 1,
@@ -277,6 +317,8 @@ class Commands {
 				return "You successfully made level ".$level['levelName']." ".$privacyText[$privacy]."!";
 			case "!sharecp":
 			case "!cp":
+				if(!Library::checkPermission($person, 'commandSharecp')) return "You don't have permissions to use command ".$command."!";
+			
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
 				if(!$player) return "This user was not found!";
 				
@@ -290,6 +332,8 @@ class Commands {
 			case '!unlockComments':
 			case '!lc':
 			case '!unlc':
+				if(!Library::checkPermission($person, 'commandLockComments')) return "You don't have permissions to use command ".$command."!";
+				
 				$lockCommentingArray = [
 					'!lockComments' => 1, '!lc' => 1,
 					'!unlockComments' => 0, '!unlc' => 0

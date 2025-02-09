@@ -115,14 +115,15 @@ class Security {
 		require_once __DIR__."/mainLib.php";
 		require_once __DIR__."/exploitPatch.php";
 		require_once __DIR__."/enums.php";
+		
 		if(isset($_POST['userName'])) {
 			$userName = Escape::latin($_POST['userName']);
 			$accountID = Library::getAccountIDWithUserName($userName);
 		} else {
 			$accountID = Escape::number($_POST['accountID']);
 		}
+		
 		$loginType = self::getLoginType();
-
 		if(!$loginType) return ["success" => false, "error" => LoginError::GenericError, "accountID" => $accountID];
 
 		$loginToAccount = $this->loginToAccountWithID($accountID, $loginType["key"], $loginType["type"]);
@@ -145,21 +146,33 @@ class Security {
 			$id = strval($level['levelID']);
 			$hash = $hash.$id[0].$id[strlen($id)-1].$level["stars"].$level["coins"];
 		}
+		
 		return sha1($hash."xI25fpAapCQg");
 	}
 	
 	public static function generateFirstHash($levelString) {
 		$len = strlen($levelString);
 		if($len < 41) return sha1($levelString."xI25fpAapCQg");
+		
 		$hash = '????????????????????????????????????????xI25fpAapCQg';
 		$m = intdiv($len, 40);
 		$i = 40;
+		
 		while($i)$hash[--$i] = $levelString[$i*$m];
+		
 		return sha1($hash);
 	}
 	
 	public static function generateSecondHash($levelString) {
 		return sha1($levelString."xI25fpAapCQg");
+	}
+	
+	public static function generateThirdHash($lvlsmultistring) {
+		return sha1($lvlsmultistring . "oC36fpYaPtdg");
+	}
+	
+	public static function generateFourthHash($lvlsmultistring){
+		return sha1($lvlsmultistring . "pC26fpYaQCtg");
 	}
 }
 ?>

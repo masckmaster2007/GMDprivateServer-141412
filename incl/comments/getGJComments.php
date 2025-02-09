@@ -44,21 +44,27 @@ foreach($comments['comments'] AS &$comment) {
 	if($commentAutoLike && array_key_exists($comment["commentID"], $specialCommentLikes)) $likes = $likes * $specialCommentLikes[$comment["commentID"]]; // Multiply by the specified value
 	if($likes < -2) $comment["isSpam"] = 1;
 	
-	$timestamp = Library::makeTime($comment['timestamp'], $extraTextArray);
-	$commentsString .= ($showLevelID ? "1~".$showLevelID."~" : "")."2~".$commentText."~3~".$comment["userID"]."~4~".$likes."~5~0~7~".$comment["isSpam"]."~9~".$timestamp."~6~".$comment["commentID"]."~10~".$comment["percent"];
 	$user = Library::getUserByID($comment['userID']);
 	if($binaryVersion > 31) {
-		//$badge = $gs->getMaxValuePermission($comment1["extID"], "modBadgeLevel");
-		//$colorString = $badge > 0 ? "~12~".$gs->getAccountCommentColor($comment1["extID"]) : "";
-		$commentsString .= "~11~0~12~255,255,255:1~".$user["userName"]."~7~1~9~".$user["icon"]."~10~".$user["color1"]."~11~".$user["color2"]."~14~".$user["iconType"]."~15~".$user["special"]."~16~".$user["extID"];
+		$person = [
+			'accountID' => $user['extID'],
+			'userID' => $user['userID'],
+			'IP' => $user['IP'],
+		];
+		
+		$appearance = Library::getPersonCommentAppearance($person);
+		if(!empty($appearance['commentsExtraText'])) $extraTextArray[] = $appearance['commentsExtraText'];
+		
+		$personString = "~11~".$appearance['modBadgeLevel'].'~12~'.$appearance['commentColor'].":1~".$user["userName"]."~7~1~9~".$user["icon"]."~10~".$user["color1"]."~11~".$user["color2"]."~14~".$user["iconType"]."~15~".$user["special"]."~16~".$user["extID"];
 	} elseif(!isset($users[$user["userID"]])) {
 		$users[$user["userID"]] = true;
 		$usersString .=  $user["userID"] . ":" . $user["userName"] . ":" . $user["extID"] . "|";
 	}
+	$timestamp = Library::makeTime($comment['timestamp'], $extraTextArray);
+	$commentsString .= ($showLevelID ? "1~".$showLevelID."~" : "")."2~".$commentText."~3~".$comment["userID"]."~4~".$likes."~5~0~7~".$comment["isSpam"]."~9~".$timestamp."~6~".$comment["commentID"]."~10~".$comment["percent"].$personString;
 	$commentsString .= "|";
 }
 
 $commentsString = rtrim($commentsString, "|");
-$usersString = rtrim($usersString, "|");
-exit($commentsString.($binaryVersion < 32 ? "#".$usersString : '')."#".$comments["count"].":".$pageOffset.":".count($comments["comments"]));
+exit($commentsString.($binaryVersion < 32 ? "#".rtrim($usersString, "|") : '')."#".$comments["count"].":".$pageOffset.":".count($comments["comments"]));
 ?>

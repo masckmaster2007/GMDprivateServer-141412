@@ -11,6 +11,8 @@ error_reporting(E_ALL & ~E_WARNING & ~E_DEPRECATED);
 
 if(!isset($db)) global $db;
 if(empty($db)) {
+	if(!isset($GLOBALS['core_cache'])) $GLOBALS['core_cache'] = [];
+	
 	try {
 		$db = new PDO("mysql:host=".$servername.";port=".$port.";dbname=".$dbname, $username, $password, array(PDO::ATTR_PERSISTENT => true));
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
