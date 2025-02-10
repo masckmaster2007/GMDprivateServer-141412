@@ -60,7 +60,7 @@ class Cron {
 		$getCheaters = $getCheaters->fetchAll();
 		
 		foreach($getCheaters AS &$ban) {
-			$getUser = Library::getUserByID();
+			$getUser = Library::getUserByID($ban['userID']);
 			$maxText = 'MAX: ⭐'.$stars.' • 🌙'.$moons.' • 👿'.$demons.' • 🪙'.$coins.' | USER: ⭐'.$getUser['stars'].' • 🌙'.$getUser['moons'].' • 👿'.$getUser['demons'].' • 🪙'.$getUser['userCoins'];
 			
 			Library::banPerson(0, $ban['userID'], $maxText, 0, 1, 2147483647);
@@ -69,6 +69,7 @@ class Cron {
 		Library::logAction($accountID, $IP, 39, $stars, $coins, $demons, $moons, count($getCheaters));
 		return true;
 	}
+	
 	public static function updateCreatorPoints($accountID, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
@@ -97,15 +98,15 @@ class Cron {
 				) AS usersTable
 				LEFT JOIN
 				(
-					SELECT count(*) as starred, userID FROM levels WHERE starStars != 0 AND isCPShared = 0 GROUP BY(userID) 
+					SELECT count(*) as starred, userID FROM levels WHERE starStars != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
 				) AS starredTable ON usersTable.userID = starredTable.userID
 				LEFT JOIN
 				(
-					SELECT count(*) as featured, userID FROM levels WHERE starFeatured != 0 AND isCPShared = 0 GROUP BY(userID) 
+					SELECT count(*) as featured, userID FROM levels WHERE starFeatured != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
 				) AS featuredTable ON usersTable.userID = featuredTable.userID
 				LEFT JOIN
 				(
-					SELECT starEpic as epic, userID FROM levels WHERE starEpic != 0 AND isCPShared = 0 GROUP BY(userID) 
+					SELECT starEpic as epic, userID FROM levels WHERE starEpic != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
 				) AS epicTable ON usersTable.userID = epicTable.userID
 			) calculated
 			ON users.userID = calculated.userID
@@ -116,7 +117,7 @@ class Cron {
 			Creator Points sharing
 		*/
 		
-		$shareCreatorPoints = $db->prepare("SELECT levelID, userID, starStars, starFeatured, starEpic FROM levels WHERE isCPShared != 0");
+		$shareCreatorPoints = $db->prepare("SELECT levelID, userID, starStars, starFeatured, starEpic FROM levels WHERE isCPShared != 0 AND isDeleted = 0");
 		$shareCreatorPoints->execute();
 		$shareCreatorPoints = $shareCreatorPoints->fetchAll();
 		
@@ -130,7 +131,7 @@ class Cron {
 			$shares = $db->prepare("SELECT userID FROM cpshares WHERE levelID = :levelID");
 			$shares->execute([':levelID' => $level["levelID"]]);
 			$shares = $shares->fetchAll();
-			$shareCount = $shares->rowCount() + 1;
+			$shareCount = count($shares) + 1;
 			
 			$addCreatorPoints = $deservedcp / $shareCount;
 			
@@ -147,7 +148,7 @@ class Cron {
 		$mapPacksCreatorPoints = $mapPacksCreatorPoints->fetchAll();
 		
 		foreach($mapPacksCreatorPoints AS &$pack) {
-			$levels = $db->prepare("SELECT userID FROM levels WHERE levelID IN (".$pack['levels'].")");
+			$levels = $db->prepare("SELECT userID FROM levels WHERE levelID IN (".$pack['levels'].") AND isDeleted = 0");
 			$levels->execute();
 			$levels = $levels->fetch();
 			
@@ -164,7 +165,7 @@ class Cron {
 		
 		foreach($gauntletsCreatorPoints AS &$gauntlet) {
 			for($x = 1; $x < 6; $x++) {
-				$gauntletCreatorPoints = $db->prepare("SELECT userID FROM levels WHERE levelID = :levelID");
+				$gauntletCreatorPoints = $db->prepare("SELECT userID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
 				$gauntletCreatorPoints->execute([':levelID' => $gauntlet["level".$x]]);
 				$gauntletCreatorPoints = $gauntletCreatorPoints->fetch();
 				
@@ -176,12 +177,12 @@ class Cron {
 			Creator Points for Daily/Weekly levels
 		*/
 		
-		$dailyCreatorPoints = $db->prepare("SELECT levelID FROM dailyfeatures WHERE timestamp < :time");
+		$dailyCreatorPoints = $db->prepare("SELECT levelID FROM dailyfeatures WHERE timestamp < :time AND timestamp > 0");
 		$dailyCreatorPoints->execute([':time' => time()]);
 		$dailyCreatorPoints = $dailyCreatorPoints->fetchAll();
 		
 		foreach($dailyCreatorPoints AS &$daily) {
-			$dailyCreatorPoint = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID");
+			$dailyCreatorPoint = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
 			$dailyCreatorPoint->execute([':levelID' => $daily["levelID"]]);
 			$dailyCreatorPoint = $dailyCreatorPoint->fetch();
 			
@@ -192,12 +193,12 @@ class Cron {
 			Creator Points for Event levels
 		*/
 		
-		$eventsCreatorPoints = $db->prepare("SELECT levelID FROM events WHERE timestamp < :time");
+		$eventsCreatorPoints = $db->prepare("SELECT levelID FROM events WHERE timestamp < :time AND duration > 0");
 		$eventsCreatorPoints->execute([':time' => time()]);
 		$eventsCreatorPoints = $eventsCreatorPoints->fetchAll();
 		
 		foreach($eventsCreatorPoints AS &$event) {
-			$eventCreatorPoints = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID");
+			$eventCreatorPoints = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
 			$eventCreatorPoints->execute([':levelID' => $event["levelID"]]);
 			$eventCreatorPoints = $eventCreatorPoints->fetch();
 			
@@ -216,6 +217,7 @@ class Cron {
 		Library::logAction($accountID, $IP, 40);
 		return true;
 	}
+	
 	public static function fixUsernames($accountID, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
@@ -240,6 +242,7 @@ class Cron {
 		Library::logAction($accountID, $IP, 41);
 		return true;
 	}
+	
 	public static function updateFriendsCount($accountID, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
@@ -272,6 +275,7 @@ class Cron {
 		Library::logAction($accountID, $IP, 42);
 		return true;
 	}
+	
 	public static function miscFixes($accountID, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
@@ -311,6 +315,7 @@ class Cron {
 		Library::logAction($accountID, $IP, 43);
 		return true;
 	}
+	
 	public static function updateSongsUsage($accountID, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
@@ -325,7 +330,28 @@ class Cron {
 			if($check) return false;
 		}
 		
-		$levels = $db->prepare("SELECT songID, songIDs, sfxIDs FROM levels");
+		/*
+			Clear songs usage
+		*/
+		
+		$db->query("UPDATE songs SET levelsCount = 0");
+		$db->query("UPDATE sfxs SET levelsCount = 0");
+		
+		/*
+			Update songs usage
+		*/
+		
+		$songsUsage = $db->prepare("UPDATE songs
+			JOIN (
+				SELECT count(*) AS songCount, songID FROM levels
+				INNER JOIN songs ON songs.ID = levels.songID AND songs.isDisabled = 0 WHERE songID > 0 AND isDeleted = 0
+				GROUP BY songID
+			) songsUsage
+			SET levelsCount = songsUsage.songCount
+			WHERE ID = songsUsage.songID");
+		$songsUsage = $songsUsage->execute();
+		
+		$levels = $db->prepare("SELECT songIDs, sfxIDs FROM levels WHERE (songIDs != '' OR sfxIDs != '') AND isDeleted = 0");
 		$levels->execute();
 		$levels = $levels->fetchAll();
 		
@@ -335,37 +361,31 @@ class Cron {
 			Count songs and SFXs usage
 		*/
 		
-		$songsLibrary = json_decode(file_get_contents(__DIR__.'/../../music/ids.json'), true) ?: [];
-		$sfxsLibrary = json_decode(file_get_contents(__DIR__.'/../../sfx/ids.json'), true) ?: [];
-		
 		foreach($levels AS &$level) {
-			$mainSong = Library::getSongByID($level['songID'], "*", $songsLibrary);
-			if($mainSong && $mainSong['isLocalSong']) $songsUsage[$mainSong['ID']]++;
-			
 			$extraSongs = explode(',', $level['songIDs']);
 			foreach($extraSongs AS &$song) {
 				if(empty($song)) continue;
-				$extraSong = Library::getSongByID($song, "*", $songsLibrary);
+				
+				$extraSong = Library::getSongByID($song);
 				if($extraSong && $extraSong['isLocalSong']) $songsUsage[$extraSong['ID']]++;
 			}
 			
 			$extraSFXs = explode(',', $level['sfxIDs']);
 			foreach($extraSFXs AS &$sfx) {
 				if(empty($sfx)) continue;
-				$extraSFX = Library::getLibrarySongInfo($sfx, 'sfx', $sfxsLibrary);
+				
+				$extraSFX = Library::getLibrarySongInfo($sfx, 'sfx');
 				if($extraSFX && $extraSFX['isLocalSFX']) $sfxsUsage[$extraSFX['originalID']]++;
 			}
 		}
+		
 		
 		/*
 			Add this info to SQL
 		*/
 		
-		$db->query("UPDATE songs SET levelsCount = 0");
-		$db->query("UPDATE sfxs SET levelsCount = 0");
-		
 		foreach($songsUsage AS $song => $usage) {
-			$addInfo = $db->prepare("UPDATE songs SET levelsCount = :usage WHERE ID = :songID");
+			$addInfo = $db->prepare("UPDATE songs SET levelsCount = levelsCount + :usage WHERE ID = :songID");
 			$addInfo->execute([':usage' => $usage, ':songID' => $song]);
 		}
 		
@@ -374,9 +394,21 @@ class Cron {
 			$addInfo->execute([':usage' => $usage, ':sfxID' => $sfx]);
 		}
 		
-		Library::logAction($accountID, $IP, 44, count($songsUsage), count($sfxsUsage));
+		/*
+			Get updated info count
+		*/
+		
+		$updatedAudio = $db->prepare("SELECT * FROM (
+			(SELECT count(*) AS songsCount FROM songs WHERE levelsCount > 0) songs
+			JOIN (SELECT count(*) AS sfxsCount FROM sfxs WHERE levelsCount > 0) sfxs
+		)");
+		$updatedAudio->execute();
+		$updatedAudio = $updatedAudio->fetch();
+		
+		Library::logAction($accountID, $IP, 44, $updatedAudio['songsCount'], $updatedAudio['sfxsCount']);
 		return true;
 	}
+	
 	public static function doEverything($accountID, $checkForTime) {
 		if(
 			!self::autoban($accountID, $checkForTime) ||

@@ -344,6 +344,15 @@ class Commands {
 				Library::lockCommentingOnLevel($levelID, $accountID, $lockCommenting);
 				
 				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on level ".$level['levelName']."!";
+			case '!delete':
+			case '!delet':
+			case '!del':
+			case '!d':
+				if(!Library::checkPermission($person, 'commandDelete')) return "You don't have permissions to use command ".$command."!";
+				
+				$deleteLevel = Library::deleteLevel($levelID, $accountID);
+				
+				return "You successfully deleted level ".$level['levelName']."!";
 		}
 		
 		return "Command ".$command." was not found.";

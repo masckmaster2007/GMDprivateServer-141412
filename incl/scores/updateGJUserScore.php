@@ -79,12 +79,15 @@ if(!empty($dinfo)) {
 	)");
 	$demonsCount->execute(); // Doesn't work with [':levels' => $dinfo] way
 	$demonsCount = $demonsCount->fetch();
+	
 	$allDemons = $demonsCount["easyNormal"] + $demonsCount["mediumNormal"] + $demonsCount["hardNormal"] + $demonsCount["insaneNormal"] + $demonsCount["extremeNormal"] + $demonsCount["easyPlatformer"] + $demonsCount["mediumPlatformer"] + $demonsCount["hardPlatformer"] + $demonsCount["insanePlatformer"] + $demonsCount["extremePlatformer"] + $dinfow + $dinfog;
 	$demonsCountDiff = min($demons - $allDemons, 3);
+	
 	$dinfo = ($demonsCount["easyNormal"] + $demonsCountDiff).','.$demonsCount["mediumNormal"].','.$demonsCount["hardNormal"].','.$demonsCount["insaneNormal"].','.$demonsCount["extremeNormal"].','.$demonsCount["easyPlatformer"].','.$demonsCount["mediumPlatformer"].','.$demonsCount["hardPlatformer"].','.$demonsCount["insanePlatformer"].','.$demonsCount["extremePlatformer"].','.$dinfow.','.$dinfog;
 }
 if(!empty($sinfo)) {
 	$sinfo = explode(",", $sinfo);
+	
 	$starsCount = $sinfo[0].",".$sinfo[1].",".$sinfo[2].",".$sinfo[3].",".$sinfo[4].",".$sinfo[5].",".$sinfod.",".$sinfog;
 	$platformerCount = $sinfo[6].",".$sinfo[7].",".$sinfo[8].",".$sinfo[9].",".$sinfo[10].",".$sinfo[11].",0"; // Last is for Map levels, unused until 2.21
 }
@@ -98,7 +101,10 @@ $demonsDifference = $demons - $user["demons"];
 $userCoinsDifference = $userCoins - $user["userCoins"];
 $diamondsDifference = $diamonds - $user["diamonds"];
 $moonsDifference = $moons - $user["moons"];
+
 Library::logAction($accountID, $IP, 9, $starsDifference, $coinsDifference, $demonsDifference, $userCoinsDifference, $diamondsDifference, $moonsDifference);
+
 if($gameVersion < 20 && !is_numeric($accountID) && $starsDifference + $coinsDifference + $demonsDifference + $userCoinsDifference + $diamondsDifference + $moonsDifference != 0) exit(CommonError::SubmitRestoreInfo);
+
 exit($userID);
 ?>

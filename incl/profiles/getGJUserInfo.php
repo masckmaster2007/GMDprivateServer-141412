@@ -5,41 +5,42 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$targetAccountID = Escape::number($_POST['targetAccountID']);
-
 $player = $sec->loginPlayer();
 if(!$player["success"]) exit(CommonError::InvalidRequest);
 $accountID = $player["accountID"];
 $userID = $player["userID"];
 $userName = $player["userName"];
 
+$friendsState = $badge = 0;
+$targetAccountID = Escape::number($_POST['targetAccountID']);
 $targetUserID = Library::getUserID($targetAccountID);
 if(!$targetUserID) exit(CommonError::InvalidRequest);
 
 $user = Library::getUserByID($targetUserID);
 $account = Library::getAccountByID($targetAccountID);
 
-$rank = $db->prepare("SELECT count(*) FROM users WHERE stars + moons > :stars + :moons");
-$rank->execute([':stars' => $user["stars"], ':moons' => $user["moons"]]);
-$rank = $rank->fetchColumn() + 1;
+$queryText = Library::getBannedPeopleQuery(0, true);
+
+$rank = Library::getUserRank($user['stars'], $user['moons']);
 $user['creatorPoints'] = round($user["creatorPoints"], PHP_ROUND_HALF_DOWN);
 $messagesState = $account['mS'];
 $friendRequestsState = $account['frS'];
 $commentsState = $account['cS'];
-$friendsState = 0;
-$badge = 0;
 
 $incomingRequest = '';
 if($accountID == $targetAccountID) {
 	$requestsCount = $db->prepare("SELECT count(*) FROM friendreqs WHERE toAccountID = :accountID");
 	$requestsCount->execute([':accountID' => $accountID]);
 	$requestsCount = $requestsCount->fetchColumn();
+	
 	$newMessagesCount = $db->prepare("SELECT count(*) FROM messages WHERE toAccountID = :accountID AND isNew = 0");
 	$newMessagesCount->execute([':accountID' => $accountID]);
 	$newMessagesCount = $newMessagesCount->fetchColumn();
+	
 	$newFriendRequestsCount = $db->prepare("SELECT count(*) FROM friendships WHERE (person1 = :accountID AND isNew2 = '1') OR (person2 = :accountID AND isNew1 = '1')");
 	$newFriendRequestsCount->execute([':accountID' => $accountID]);
 	$newFriendRequestsCount = $newFriendRequestsCount->fetchColumn();
+	
 	$incomingRequestText = ":38:".$newMessagesCount.":39:".$requestsCount.":40:".$newFriendRequestsCount;
 } else {
 	$isFriends = Library::isFriends($accountID, $targetAccountID);

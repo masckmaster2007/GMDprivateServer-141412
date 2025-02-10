@@ -48,3 +48,4 @@ music/*.json
 sfx/gdps.*
 sfx/s*.*
 sfx/*.json
+test.php

@@ -294,11 +294,11 @@ class Library {
 	public static function getCommentsOfUser($userID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':userID' => $userID]);
 		$comments = $comments->fetchAll();
 		
-		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0");
+		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 AND levels.isDeleted = 0");
 		$commentsCount->execute([':userID' => $userID]);
 		$commentsCount = $commentsCount->fetchColumn();
 		
@@ -573,6 +573,269 @@ class Library {
 		return $roleAppearance;
 	}
 	
+	public static function getAllBannedPeople($type) {
+		if(isset($GLOBALS['core_cache']['bannedPeople'][$type])) return $GLOBALS['core_cache']['bannedPeople'][$type];
+		
+		$extIDs = $userIDs = $bannedIPs = [];
+		
+		$bans = self::getAllBansOfBanType($type);
+		
+		foreach($bans AS &$ban) {
+			switch($ban['personType']) {
+				case 0:
+					$extIDs[] = $ban['person'];
+					break;
+				case 1:
+					$userIDs[] = $ban['person'];
+					break;
+				case 2:
+					$bannedIPs[] = self::IPForBan($ban['person'], true);
+					break;
+			}
+		}
+		
+		$bannedPeople = ['accountIDs' => $extIDs, 'userIDs' => $userIDs, 'IPs' => $bannedIPs];
+		
+		$GLOBALS['core_cache']['bannedPeople'][$type] = $bannedPeople;
+		
+		return $bannedPeople;
+	}
+	
+	public static function getBannedPeopleQuery($type, $addSeparator = false) {
+		if(isset($GLOBALS['core_cache']['bannedPeopleQuery'][$type])) return $GLOBALS['core_cache']['bannedPeopleQuery'][$type];
+
+		$queryArray = [];
+		
+		$bannedPeople = self::getAllBannedPeople($type);
+		
+		$extIDsString = implode("','", $bannedPeople['accountIDs']);
+		$userIDsString = implode("','", $bannedPeople['userIDs']);
+		$bannedIPsString = implode("|", $bannedPeople['IPs']);
+		
+		if(!empty($extIDsString)) $queryArray[] = "extID NOT IN ('".$extIDsString."')";
+		if(!empty($userIDsString)) $queryArray[] = "userID NOT IN ('".$userIDsString."')";
+		if(!empty($bannedIPsString)) $queryArray[] = "IP NOT REGEXP '".$bannedIPsString."'";
+	
+		$queryText = !empty($queryArray) ? '('.implode(' AND ', $queryArray).')'.($addSeparator ? ' AND' : '') : '';
+		
+		$GLOBALS['core_cache']['bannedPeopleQuery'][$type] = $queryText;
+		
+		return $queryText;
+	}
+	
+	public static function getLeaderboard($accountID, $userID, $type, $count) {
+		require __DIR__."/../../config/misc.php";
+		require __DIR__."/connection.php";
+		
+		$user = self::getUserByID($userID);
+		$rank = 0;
+		
+		switch($type) {
+			case 'top':
+				$queryText = self::getBannedPeopleQuery(0, true);
+				
+				$leaderboard = $db->prepare("SELECT * FROM users WHERE ".$queryText." stars >= :stars ORDER BY stars + moons DESC, userName ASC LIMIT 100");
+				$leaderboard->execute([':stars' => $leaderboardMinStars]);
+				
+				break;
+			case 'creators':
+				$queryText = self::getBannedPeopleQuery(1, true);
+				
+				$leaderboard = $db->prepare("SELECT * FROM users WHERE ".$queryText." creatorPoints > 0 ORDER BY creatorPoints DESC, userName ASC LIMIT 100");
+				$leaderboard->execute();
+				break;
+			case 'relative':
+				if($moderatorsListInGlobal) {
+					$leaderboard = $db->prepare("SELECT * FROM users
+						INNER JOIN roleassign ON
+							(users.extID = roleassign.person AND roleassign.personType = 0) OR
+							(users.userID = roleassign.person AND roleassign.personType = 1)
+						INNER JOIN roles ON roleassign.roleID = roles.roleID
+						ORDER BY roles.priority DESC, users.userName ASC");
+					$leaderboard ->execute();
+					break;
+				}
+				
+				$queryText = self::getBannedPeopleQuery(0, true);
+				
+				$count = floor($count / 2);
+				
+				$leaderboard = $db->prepare("SELECT leaderboards.* FROM (
+						(
+							SELECT * FROM users
+							WHERE ".$queryText."
+							stars + moons <= :stars
+							ORDER BY stars + moons DESC
+							LIMIT ".$count."
+						)
+						UNION
+						(
+							SELECT * FROM users
+							WHERE ".$queryText."
+							stars + moons >= :stars
+							ORDER BY stars + moons ASC
+							LIMIT ".$count."
+						)
+					) as leaderboards
+					ORDER BY leaderboards.stars + leaderboards.moons DESC, leaderboards.userName ASC");
+				$leaderboard->execute([':stars' => $user['stars'] + $user['moons']]);
+				
+				$rank = max(0, self::getUserRank($user['stars'], $user['moons']) - $count);
+				
+				break;
+			case 'friends':
+				$friendsArray = Library::getFriends($accountID);
+				$friendsArray[] = $accountID;
+				$friendsString = implode(",", $friendsArray);
+				
+				$leaderboard = $db->prepare("SELECT * FROM users WHERE extID IN (".$friendsString.") ORDER BY stars + moons DESC, userName ASC");
+				$leaderboard->execute();
+				break;
+			case 'week':
+				$queryText = self::getBannedPeopleQuery(0, true);
+
+				$leaderboard = $db->prepare("SELECT users.*, SUM(actions.value) AS stars, SUM(actions.value2) AS coins, SUM(actions.value3) AS demons FROM actions
+					INNER JOIN users ON actions.account = users.extID WHERE type = '9' AND timestamp > :time AND ".$queryText." actions.value > 0
+					ORDER BY stars DESC, userName ASC LIMIT 100");
+				$leaderboard->execute([':time' => time() - 604800]);
+				break;
+		}
+		
+		$leaderboard = $leaderboard->fetchAll();
+		
+		return ["rank" => $rank, "leaderboard" => $leaderboard];
+	}
+	
+	public static function getUserRank($stars, $moons) {
+		require __DIR__."/connection.php";
+		
+		$queryText = self::getBannedPeopleQuery(0, true);
+		
+		$rank = $db->prepare("SELECT count(*) FROM users WHERE ".$queryText." stars + moons >= :stars ORDER BY userName ASC");
+		$rank->execute([':stars' => $stars + $moons]);
+		$rank = $rank->fetchColumn();
+		
+		return $rank;
+	}
+	
+	public static function getAccountMessages($accountID, $getSent, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$messages = $db->prepare("SELECT * FROM messages JOIN users ON messages.".($getSent ? 'toAccountID' : 'accountID')." = users.extID WHERE messages.".($getSent ? 'accountID' : 'toAccountID')." = :accountID ORDER BY messages.timestamp DESC LIMIT 10 OFFSET ".$pageOffset);
+		$messages->execute([':accountID' => $accountID]);
+		$messages = $messages->fetchAll();
+		
+		$messagesCount = $db->prepare("SELECT count(*) FROM messages WHERE ".($getSent ? 'toAccountID' : 'accountID')." = :accountID");
+		$messagesCount->execute([':accountID' => $accountID]);
+		$messagesCount = $messagesCount->fetchColumn();
+		
+		return ['messages' => $messages, 'count' => $messagesCount];
+	}
+	
+	public static function readMessage($accountID, $messageID, $isSender) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		require_once __DIR__."/XOR.php";
+		
+		$getMessage = $db->prepare("SELECT * FROM messages JOIN users ON messages.".($isSender ? 'toAccountID' : 'accountID')." = users.extID WHERE messages.".($isSender ? 'accountID' : 'toAccountID')." = :accountID AND messages.messageID = :messageID");
+		$getMessage->execute([':accountID' => $accountID, ':messageID' => $messageID]);
+		$getMessage = $getMessage->fetch();
+		
+		if(!$getMessage) return false;
+		
+		$readMessage = $db->prepare("UPDATE messages SET isNew = 1, readTime = :readTime WHERE messageID = :messageID AND toAccountID = :accountID AND readTime = 0");
+		$readMessage->execute([':messageID' => $messageID, ':accountID' => $accountID, ':readTime' => time()]);
+		
+		$getMessage["subject"] = Escape::url_base64_encode(Escape::translit(Escape::url_base64_decode($getMessage["subject"])));
+		$getMessage["body"] = Escape::url_base64_encode(XORCipher::cipher(Escape::translit(XORCipher::cipher(Escape::url_base64_decode($getMessage["body"]), 14251)), 14251));
+		
+		return $getMessage;
+	}
+	
+	public static function canSendMessage($person, $toAccountID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID];
+		
+		if($person['accountID'] == $toAccountID) {
+			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		$checkBan = self::getPersonBan($person['accountID'], $person['userID'], 3, $person['IP']);
+		if($checkBan) {
+			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		$account = self::getAccountByID($toAccountID);
+		if(!$account) {
+			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		$isBlocked = self::isPersonBlocked($person['accountID'], $toAccountID);
+		if($isBlocked) {
+			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+
+		switch($account['mS']) {
+			case 2:
+				$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+				return false;
+			case 1:
+				$isFriends = self::isFriends($person['accountID'], $toAccountID);
+				if(!$isFriends) {
+					$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
+					return false;
+				}
+				
+				break;
+		}
+				
+		// Automod here
+		
+		$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = true;
+		
+		return true;
+	}
+	
+	public static function isPersonBlocked($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID];
+		
+		$isBlocked = $db->prepare("SELECT count(*) FROM blocks WHERE person1 = :accountID AND person2 = :targetAccountID");
+		$isBlocked->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		$isBlocked = $isBlocked->fetchColumn() > 0;
+		
+		$GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID] = $isBlocked;
+		
+		return $isBlocked;
+	}
+	
+	public static function sendMessage($accountID, $toAccountID, $subject, $body) {
+		require __DIR__."/connection.php";
+		
+		$sendMessage = $db->prepare("INSERT INTO messages (subject, body, accountID, toAccountID, timestamp)
+			VALUES (:subject, :body, :accountID, :toAccountID, :timestamp)");
+		$sendMessage->execute([':subject' => $subject, ':body' => $body, ':accountID' => $accountID, ':toAccountID' => $toAccountID, ':timestamp' => time()]);
+		
+		return true;
+	}
+	
+	public static function deleteMessages($accountID, $messages) {
+		require __DIR__."/connection.php";
+		
+		if(!$messages) return false;
+		
+		$deleteMessages = $db->prepare("DELETE FROM messages WHERE messageID IN (".$messages.") AND (accountID = :accountID OR toAccountID = :accountID)");
+		$deleteMessages->execute([':accountID' => $accountID]);
+		
+		return true;
+	}
+	
 	/*
 		Levels-related functions
 	*/
@@ -581,11 +844,13 @@ class Library {
 		if(strpos($rawDesc, '<c') !== false) {
 			$tagsStart = substr_count($rawDesc, '<c');
 			$tagsEnd = substr_count($rawDesc, '</c>');
+			
 			if($tagsStart > $tagsEnd) {
 				$tags = $tagsStart - $tagsEnd;
 				for($i = 0; $i < $tags; $i++) $rawDesc .= '</c>';
 			}
 		}
+		
 		return $rawDesc;
 	}
 	
@@ -596,12 +861,12 @@ class Library {
 		$checkBan = self::getPersonBan($accountID, $userID, 2, $IP);
 		if($checkBan) return ["success" => false, "error" => CommonError::Banned];
 		
-		$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time');
+		$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0');
 		$lastUploadedLevel->execute([':time' => time() - $globalLevelsUploadDelay]);
 		$lastUploadedLevel = $lastUploadedLevel->fetchColumn();
 		if($lastUploadedLevel) return ["success" => false, "error" => LevelUploadError::TooFast];
 		
-		$lastUploadedLevelByUser = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND (userID = :userID OR hostname = :IP)');
+		$lastUploadedLevelByUser = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0 AND (userID = :userID OR hostname = :IP)');
 		$lastUploadedLevelByUser->execute([':time' => time() - $perUserLevelsUploadDelay, ':userID' => $userID, ':IP' => $IP]);
 		$lastUploadedLevelByUser = $lastUploadedLevelByUser->fetchColumn();
 		if($lastUploadedLevelByUser) return ["success" => false, "error" => LevelUploadError::TooFast];
@@ -615,7 +880,7 @@ class Library {
 		
 		$IP = IP::getIP();
 		
-		$checkLevelExistenceByID = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND userID = :userID");
+		$checkLevelExistenceByID = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND userID = :userID AND isDeleted = 0");
 		$checkLevelExistenceByID->execute([':levelID' => $levelID, ':userID' => $userID]);
 		$checkLevelExistenceByID = $checkLevelExistenceByID->fetch();
 		if($checkLevelExistenceByID) {
@@ -631,7 +896,7 @@ class Library {
 			return ["success" => true, "levelID" => (string)$levelID];
 		}
 		
-		$checkLevelExistenceByName = $db->prepare("SELECT levelID, updateLocked FROM levels WHERE levelName LIKE :levelName AND userID = :userID ORDER BY levelID DESC LIMIT 1");
+		$checkLevelExistenceByName = $db->prepare("SELECT levelID, updateLocked FROM levels WHERE levelName LIKE :levelName AND userID = :userID AND isDeleted = 0 ORDER BY levelID DESC LIMIT 1");
 		$checkLevelExistenceByName->execute([':levelName' => $levelName, ':userID' => $userID]);
 		$checkLevelExistenceByName = $checkLevelExistenceByName->fetchColumn();
 		if($checkLevelExistenceByName) {
@@ -640,7 +905,7 @@ class Library {
 			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$checkLevelExistenceByName, $levelString);
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
 			
-			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
+			$updateLevel = $db->prepare('UPDATE levels SET userName = :userName, gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, hostname = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID AND isDeleted = 0');
 			$updateLevel->execute([':levelID' => $checkLevelExistenceByName, ':userName' => $levelDetails['userName'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
 			
 			self::logAction($accountID, $IP, 23, $levelName, $levelDetails['levelDesc'], $levelID);
@@ -664,11 +929,11 @@ class Library {
 	public static function getLevels($filters, $order, $orderSorting, $queryJoin, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(") AND (", $filters).") ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
+		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(") AND (", $filters).") AND isDeleted = 0 ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
 		$levels->execute();
 		$levels = $levels->fetchAll();
 		
-		$levelsCount = $db->prepare("SELECT count(*) FROM levels ".$queryJoin." WHERE (".implode(" ) AND ( ", $filters).")");
+		$levelsCount = $db->prepare("SELECT count(*) FROM levels ".$queryJoin." WHERE (".implode(" ) AND ( ", $filters).") AND isDeleted = 0");
 		$levelsCount->execute();
 		$levelsCount = $levelsCount->fetchColumn();
 		
@@ -734,7 +999,7 @@ class Library {
 		
 		if(isset($GLOBALS['core_cache']['levels'][$levelID])) return $GLOBALS['core_cache']['levels'][$levelID];
 		
-		$level = $db->prepare('SELECT * FROM levels WHERE levelID = :levelID');
+		$level = $db->prepare('SELECT * FROM levels WHERE levelID = :levelID AND isDeleted = 0');
 		$level->execute([':levelID' => $levelID]);
 		$level = $level->fetch();
 		
@@ -751,7 +1016,7 @@ class Library {
 		$getDownloads = $getDownloads->fetchColumn();
 		if($getDownloads) return false;
 		
-		$addDownload = $db->prepare("UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID");
+		$addDownload = $db->prepare("UPDATE levels SET downloads = downloads + 1 WHERE levelID = :levelID AND isDeleted = 0");
 		$addDownload->execute([':levelID' => $levelID]);
 		$insertAction = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID)
 			VALUES (:levelID, INET6_ATON(:IP), :accountID)");
@@ -769,11 +1034,11 @@ class Library {
 	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT *, levels.userID AS levelUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT *, levels.userID AS levelUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':levelID' => $levelID]);
 		$comments = $comments->fetchAll();
 		
-		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID");
+		$commentsCount = $db->prepare("SELECT count(*) FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID AND levels.isDeleted = 0");
 		$commentsCount->execute([':levelID' => $levelID]);
 		$commentsCount = $commentsCount->fetchColumn();
 		
@@ -907,7 +1172,9 @@ class Library {
 	}
 	
 	public static function rateLevel($levelID, $accountID, $difficulty, $stars, $verifyCoins, $featured) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$realDifficulty = self::getLevelDifficulty($difficulty);
 		if($featured) {
@@ -918,8 +1185,10 @@ class Library {
 		$starDemon = $realDifficulty['demon'] != 0 ? 1 : 0;
 		$demonDiff = $realDifficulty['demon'];
 		
-		$rateLevel = $db->prepare("UPDATE levels SET starDifficulty = :starDifficulty, difficultyDenominator = 10, starStars = :starStars, starFeatured = :starFeatured, starEpic = :starEpic, starCoins = :starCoins, starDemon = :starDemon, starDemonDiff = :starDemonDiff, starAuto = :starAuto, rateDate = :rateDate WHERE levelID = :levelID");
+		$rateLevel = $db->prepare("UPDATE levels SET starDifficulty = :starDifficulty, difficultyDenominator = 10, starStars = :starStars, starFeatured = :starFeatured, starEpic = :starEpic, starCoins = :starCoins, starDemon = :starDemon, starDemonDiff = :starDemonDiff, starAuto = :starAuto, rateDate = :rateDate WHERE levelID = :levelID AND isDeleted = 0");
 		$rateLevel->execute([':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starEpic' => $epic, ':starCoins' => $starCoins, ':starDemon' => $starDemon, ':starDemonDiff' => $demonDiff, ':starAuto' => $realDifficulty['auto'], ':rateDate' => time(), ':levelID' => $levelID]);
+		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
 		
 		return $realDifficulty['name'];
 	}
@@ -927,7 +1196,7 @@ class Library {
 	public static function nextFeaturedID() {
 		require __DIR__."/connection.php";
 		
-		$featuredID = $db->prepare("SELECT starFeatured FROM levels ORDER BY starFeatured DESC LIMIT 1");
+		$featuredID = $db->prepare("SELECT starFeatured FROM levels WHERE isDeleted = 0 ORDER BY starFeatured DESC LIMIT 1");
 		$featuredID->execute();
 		$featuredID = $featuredID->fetchColumn() + 1;
 		
@@ -935,7 +1204,9 @@ class Library {
 	}
 	
 	public static function setLevelAsDaily($levelID, $accountID, $type) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$isDaily = self::isLevelDaily($levelID, $type);
 		if($isDaily) return false;
@@ -945,6 +1216,8 @@ class Library {
 		$setDaily = $db->prepare("INSERT INTO dailyfeatures (levelID, type, timestamp)
 			VALUES (:levelID, :type, :timestamp)");
 		$setDaily->execute([':levelID' => $levelID, ':type' => $type, ':timestamp' => $dailyTime]);
+		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
 		
 		return $dailyTime;
 	}
@@ -975,7 +1248,9 @@ class Library {
 	}
 	
 	public static function setLevelAsEvent($levelID, $accountID, $duration, $rewards) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$isEvent = self::isLevelEvent($levelID);
 		if($isEvent) return false;
@@ -985,6 +1260,8 @@ class Library {
 		$setEvent = $db->prepare("INSERT INTO events (levelID, timestamp, duration, rewards)
 			VALUES (:levelID, :timestamp, :duration, :rewards)");
 		$setEvent->execute([':levelID' => $levelID, ':timestamp' => $eventTime, ':duration' => $eventTime + $duration, ':rewards' => $rewards]);
+		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
 		
 		return $eventTime;
 	}
@@ -1041,7 +1318,9 @@ class Library {
 	}
 	
 	public static function removeDailyLevel($levelID, $accountID, $type) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$isDaily = self::isLevelDaily($levelID, $type);
 		if(!$isDaily) return false;
@@ -1049,11 +1328,15 @@ class Library {
 		$removeDaily = $db->prepare("UPDATE dailyfeatures SET timestamp = timestamp * -1 WHERE feaID = :feaID");
 		$removeDaily->execute([':feaID' => $isDaily]);
 		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
+		
 		return true;
 	}
 	
 	public static function removeEventLevel($levelID, $accountID) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$isEvent = self::isLevelEvent($levelID);
 		if(!$isEvent) return false;
@@ -1061,14 +1344,20 @@ class Library {
 		$removeEvent = $db->prepare("UPDATE events SET duration = duration * -1 WHERE feaID = :feaID");
 		$removeEvent->execute([':feaID' => $isEvent]);
 		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
+		
 		return true;
 	}
 	
 	public static function moveLevel($levelID, $accountID, $player) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
-		$setAccount = $db->prepare("UPDATE levels SET extID = :extID, userID = :userID, userName = :userName WHERE levelID = :levelID");
+		$setAccount = $db->prepare("UPDATE levels SET extID = :extID, userID = :userID, userName = :userName WHERE levelID = :levelID AND isDeleted = 0");
 		$setAccount->execute([':extID' => $player['extID'], ':userID' => $player['userID'], ':userName' => $player['userName'], ':levelID' => $levelID]);
+		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
 		
 		return true;
 	}
@@ -1076,7 +1365,7 @@ class Library {
 	public static function lockUpdatingLevel($levelID, $accountID, $lockUpdating) {
 		require __DIR__."/connection.php";
 		
-		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID");
+		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
 		
 		return true;
@@ -1099,7 +1388,7 @@ class Library {
 	public static function renameLevel($levelID, $accountID, $levelName) {
 		require __DIR__."/connection.php";
 		
-		$renameLevel = $db->prepare("UPDATE levels SET levelName = :levelName WHERE levelID = :levelID");
+		$renameLevel = $db->prepare("UPDATE levels SET levelName = :levelName WHERE levelID = :levelID AND isDeleted = 0");
 		$renameLevel->execute([':levelID' => $levelID, ':levelName' => $levelName]);
 		
 		return true;
@@ -1110,17 +1399,21 @@ class Library {
 		
 		if($newPassword == '000000') $newPassword = '';
 		
-		$changeLevelPassword = $db->prepare("UPDATE levels SET password = :password WHERE levelID = :levelID");
+		$changeLevelPassword = $db->prepare("UPDATE levels SET password = :password WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelPassword->execute([':levelID' => $levelID, ':password' => "1".$newPassword]);
 		
 		return true;
 	}
 	
 	public static function changeLevelSong($levelID, $accountID, $songID) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
-		$changeLevelSong = $db->prepare("UPDATE levels SET songID = :songID WHERE levelID = :levelID");
+		$changeLevelSong = $db->prepare("UPDATE levels SET songID = :songID WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelSong->execute([':levelID' => $levelID, ':songID' => $songID]);
+		
+		if($automaticCron) Cron::updateSongsUsage($accountID, false);
 		
 		return true;
 	}
@@ -1129,7 +1422,7 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
 		
-		$changeLevelDescription = $db->prepare("UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID");
+		$changeLevelDescription = $db->prepare("UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelDescription->execute([':levelID' => $levelID, ':levelDesc' => Escape::url_base64_encode($description)]);
 		
 		return true;
@@ -1138,14 +1431,16 @@ class Library {
 	public static function changeLevelPrivacy($levelID, $accountID, $privacy) {
 		require __DIR__."/connection.php";
 		
-		$changeLevelPrivacy = $db->prepare("UPDATE levels SET unlisted = :privacy, unlisted2 = :privacy WHERE levelID = :levelID");
+		$changeLevelPrivacy = $db->prepare("UPDATE levels SET unlisted = :privacy, unlisted2 = :privacy WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelPrivacy->execute([':levelID' => $levelID, ':privacy' => $privacy]);
 		
 		return true;
 	}
 	
 	public static function shareCreatorPoints($levelID, $accountID, $targetUserID) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
 		
 		$changeLevel = $db->prepare("UPDATE levels SET isCPShared = 1 WHERE levelID = :levelID");
 		$changeLevel->execute([':levelID' => $levelID]);
@@ -1159,13 +1454,15 @@ class Library {
 			VALUES (:levelID, :userID)");
 		$shareCreatorPoints->execute([':levelID' => $levelID, ':userID' => $targetUserID]);
 		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
+		
 		return true;
 	}
 	
 	public static function lockCommentingOnLevel($levelID, $accountID, $lockCommenting) {
 		require __DIR__."/connection.php";
 
-		$lockLevel = $db->prepare("UPDATE levels SET commentLocked = :commentLocked WHERE levelID = :levelID");
+		$lockLevel = $db->prepare("UPDATE levels SET commentLocked = :commentLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':commentLocked' => $lockCommenting, ':levelID' => $levelID]);
 		
 		return true;
@@ -1184,6 +1481,21 @@ class Library {
 		// Automod here
 		
 		return ["success" => true];
+	}
+	
+	public static function deleteLevel($levelID, $accountID) {
+		require __DIR__."/../../config/misc.php";
+		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
+		
+		$deleteLevel = $db->prepare("UPDATE levels SET isDeleted = 1 WHERE levelID = :levelID AND isDeleted = 0");
+		$deleteLevel->execute([':levelID' => $levelID]);
+		
+		if(file_exists(__DIR__."/../../data/levels/".$levelID)) rename(__DIR__."/../../data/levels/".$levelID, __DIR__."/../../data/levels/deleted/".$levelID);
+		
+		if($automaticCron) Cron::updateCreatorPoints($accountID, false);
+		
+		return true;
 	}
 	
 	/*
@@ -1208,7 +1520,7 @@ class Library {
 		Audio-related functions
 	*/
 	
-	public static function getSongByID($songID, $column = "*", $library = false) {
+	public static function getSongByID($songID, $column = "*") {
 		require __DIR__."/connection.php";
 		
 		if(isset($GLOBALS['core_cache']['songs'][$songID])) {
@@ -1224,7 +1536,7 @@ class Library {
 		$song = $song->fetch();
 		
 		if(!$song) {
-			$song = self::getLibrarySongInfo($songID, 'music', $library);
+			$song = self::getLibrarySongInfo($songID, 'music');
 			$isLocalSong = false;
 		}
 		
@@ -1243,6 +1555,8 @@ class Library {
 	public static function getSFXByID($sfxID, $column = "*") {
 		require __DIR__."/connection.php";
 		
+		$isLocalSFX = true;
+		
 		if(isset($GLOBALS['core_cache']['sfxs'][$sfxID])) {
 			if($column != "*" && $GLOBALS['core_cache']['sfxs'][$sfxID]) return $GLOBALS['core_cache']['sfxs'][$sfxID][$column];
 			
@@ -1253,12 +1567,21 @@ class Library {
 		$sfx->execute([':sfxID' => $sfxID]);
 		$sfx = $sfx->fetch();
 		
+		if(!$sfx) {
+			$song = self::getLibrarySongInfo($sfxID, 'sfx');
+			$isLocalSFX = false;
+		}
+		
+		if(!$sfx) {
+			$GLOBALS['core_cache']['sfxs'][$sfxID] = false;
+			return false;
+		}
+		
+		$sfx['isLocalSFX'] = $isLocalSFX;
 		$GLOBALS['core_cache']['sfxs'][$sfxID] = $sfx;
 		
-		if(empty($sfx)) return false;
-		
 		if($column != "*") return $sfx[$column];
-		else return array("ID" => $sfx["ID"], "name" => $sfx["name"], "authorName" => $sfx["authorName"], "size" => $sfx["size"], "download" => $sfx["download"], "reuploadTime" => $sfx["reuploadTime"], "reuploadID" => $sfx["reuploadID"]);
+		else return array("isLocalSFX" => $isLocalSFX, "ID" => $sfx["ID"], "name" => $sfx["name"], "authorName" => $sfx["authorName"], "size" => $sfx["size"], "download" => $sfx["download"], "reuploadTime" => $sfx["reuploadTime"], "reuploadID" => $sfx["reuploadID"]);
 	}
 	
 	public static function getSongString($songID) {
@@ -1289,32 +1612,57 @@ class Library {
 		return "1~|~".$song["ID"]."~|~2~|~".Escape::translit(str_replace("#", "", $song["name"]))."~|~3~|~".$song["authorID"]."~|~4~|~".Escape::translit($song["authorName"])."~|~5~|~".$song["size"]."~|~6~|~~|~10~|~".$downloadLink."~|~7~|~~|~8~|~1".$extraSongString;
 	}
 	
-	public static function getLibrarySongInfo($audioID, $type = 'music', $extraLibrary = false) {
+	public static function getLibrarySongInfo($audioID, $type = 'music') {
 		require __DIR__."/../../config/dashboard.php";
+		
+		
 		if(!file_exists(__DIR__.'/../../'.$type.'/ids.json')) return false;
+		
+		if(isset($GLOBALS['core_cache']['libraryAudio'][$type][$audioID])) return $GLOBALS['core_cache']['libraryAudio'][$type][$audioID];
+		
 		$servers = $serverIDs = $serverNames = [];
+		
 		foreach($customLibrary AS $customLib) {
 			$servers[$customLib[0]] = $customLib[2];
 			$serverNames[$customLib[0]] = $customLib[1];
 			$serverIDs[$customLib[2]] = $customLib[0];
 		}
 		
-		$library = $extraLibrary ? $extraLibrary : json_decode(file_get_contents(__DIR__.'/../../'.$type.'/ids.json'), true);
-		if(!isset($library['IDs'][$audioID]) || ($type == 'music' && $library['IDs'][$audioID]['type'] != 1)) return false;
+		if(!isset($GLOBALS['core_cache']['libraryFile'][$type])) {
+			$library = json_decode(file_get_contents(__DIR__.'/../../'.$type.'/ids.json'), true);
+			
+			$GLOBALS['core_cache']['libraryFile'][$type] = $library;
+		} else $library = $GLOBALS['core_cache']['libraryFile'][$type];
+		
+		if(!isset($library['IDs'][(int)$audioID]) || ($type == 'music' && $library['IDs'][(int)$audioID]['type'] != 1)) return false;
 		
 		if($type == 'music') {
-			$song = $library['IDs'][$audioID];
+			$song = $library['IDs'][(int)$audioID];
 			$author = $library['IDs'][$song['authorID']];
-			$token =self::randomString(22);
-			$expires = time() + 3600;
-			$link = $servers[$song['server']].'/music/'.$song['originalID'].'.ogg?token='.$token.'&expires='.$expires;
-			return ['server' => $song['server'], 'ID' => $audioID, 'name' => $song['name'], 'authorID' => $song['authorID'], 'authorName' => $author['name'], 'size' => round($song['size'] / 1024 / 1024, 2), 'download' => $link, 'seconds' => $song['seconds'], 'tags' => $song['tags'], 'ncs' => $song['ncs'], 'artists' => $song['artists'], 'externalLink' => $song['externalLink'], 'new' => $song['new'], 'priorityOrder' => $song['priorityOrder']];
-		} else {
-			$SFX = $library['IDs'][$audioID];
+			
 			$token = self::randomString(22);
 			$expires = time() + 3600;
+			
+			$link = $servers[$song['server']].'/music/'.$song['originalID'].'.ogg?token='.$token.'&expires='.$expires;
+			
+			$songArray = ['server' => $song['server'], 'ID' => $audioID, 'name' => $song['name'], 'authorID' => $song['authorID'], 'authorName' => $author['name'], 'size' => round($song['size'] / 1024 / 1024, 2), 'download' => $link, 'seconds' => $song['seconds'], 'tags' => $song['tags'], 'ncs' => $song['ncs'], 'artists' => $song['artists'], 'externalLink' => $song['externalLink'], 'new' => $song['new'], 'priorityOrder' => $song['priorityOrder']];
+			
+			$GLOBALS['core_cache']['libraryAudio'][$type][$audioID] = $songArray;
+			
+			return $songArray;
+		} else {
+			$SFX = $library['IDs'][(int)$audioID];
+			
+			$token = self::randomString(22);
+			$expires = time() + 3600;
+			
 			$link = $servers[$SFX['server']] != null ? $servers[$SFX['server']].'/sfx/s'.$SFX['ID'].'.ogg?token='.$token.'&expires='.$expires : self::getSFXByID($SFX['ID'], 'download');
-			return ['isLocalSFX' => $servers[$SFX['server']] == null, 'server' => $SFX['server'], 'ID' => $audioID, 'name' => $song['name'], 'download' => $link, 'originalID' => $SFX['ID']];
+			
+			$sfxArray = ['isLocalSFX' => $servers[$SFX['server']] == null, 'server' => $SFX['server'], 'ID' => $audioID, 'name' => $song['name'], 'download' => $link, 'originalID' => $SFX['ID']];
+			
+			$GLOBALS['core_cache']['libraryAudio'][$type][$audioID] = $sfxArray;
+			
+			return $sfxArray;
 		}
 	}
 	
@@ -1501,7 +1849,7 @@ class Library {
 						}
 					}
 				}
-				$sfxs = $db->prepare("SELECT sfxs.*, accounts.userName FROM sfxs JOIN accounts ON accounts.accountID = sfxs.reuploadID");
+				$sfxs = $db->prepare("SELECT sfxs.*, accounts.userName FROM sfxs JOIN accounts ON accounts.accountID = sfxs.reuploadID WHERE isDisabled = 0");
 				$sfxs->execute();
 				$sfxs = $sfxs->fetchAll();
 				$folderID = $gdpsLibrary = [];
@@ -1731,7 +2079,7 @@ class Library {
 	public static function lastSongTime() {
 		require __DIR__."/connection.php";
 		
-		$lastSongTime = $db->prepare('SELECT reuploadTime FROM songs WHERE reuploadTime > 0 ORDER BY reuploadTime DESC LIMIT 1');
+		$lastSongTime = $db->prepare('SELECT reuploadTime FROM songs WHERE reuploadTime > 0 AND isDisabled = 0 ORDER BY reuploadTime DESC LIMIT 1');
 		$lastSongTime->execute();
 		$lastSongTime = $lastSongTime->fetchColumn();
 		if(!$lastSongTime) $lastSongTime = 1;
@@ -1742,7 +2090,7 @@ class Library {
 	public static function lastSFXTime() {
 		require __DIR__."/connection.php";
 		
-		$lastSongTime = $db->prepare('SELECT reuploadTime FROM sfxs WHERE reuploadTime > 0 ORDER BY reuploadTime DESC LIMIT 1');
+		$lastSongTime = $db->prepare('SELECT reuploadTime FROM sfxs WHERE reuploadTime > 0 AND isDisabled = 0 ORDER BY reuploadTime DESC LIMIT 1');
 		$lastSongTime->execute();
 		$lastSongTime = $lastSongTime->fetchColumn();
 		if(!$lastSongTime) $lastSongTime = 1;
@@ -1764,6 +2112,16 @@ class Library {
 		return $db->lastInsertId();
 	}
 	
+	public static function logModeratorAction($accountID, $IP, $type, $value1 = '', $value2 = '', $value3 = '', $value4 = '', $value5 = '', $value6 = '', $value7 = '') {
+		require __DIR__."/connection.php";
+		
+		$insertModeratorAction = $db->prepare('INSERT INTO modactions (account, type, timestamp, value, value2, value3, value4, value5, value6, value7, IP)
+			VALUES (:account, :type, :timestamp, :value, :value2, :value3, :value4, :value5, :value6, :value7, :IP)');
+		$insertModeratorAction->execute([':account' => $accountID, ':type' => $type, ':value' => $value1, ':value2' => $value2, ':value3' => $value3, ':value4' => $value4, ':value5' => $value5, ':value6' => $value6, ':value7' => $value7, ':timestamp' => time(), ':IP' => $IP]);
+		
+		return $db->lastInsertId();
+	}
+	
 	public static function randomString($length = 6) {
 		$randomString = openssl_random_pseudo_bytes(round($length / 2, 0, PHP_ROUND_HALF_UP));
 		if($randomString == false) {
@@ -1781,8 +2139,11 @@ class Library {
 	
 	public static function makeTime($time, $extraTextArray = []) {
 		require __DIR__."/../../config/dashboard.php";
+		
 		if(!isset($timeType)) $timeType = 0;
+		
 		$extraText = !empty($extraTextArray) ? implode(", ", $extraTextArray).', ' : '';
+		
 		switch($timeType) {
 			case 1:
 				if(date("d.m.Y", $time) == date("d.m.Y", time())) return $extraText.date("G;i", $time);
@@ -1793,11 +2154,14 @@ class Library {
 				// taken from https://stackoverflow.com/a/36297417
 				$isFuture = false;
 				$time = time() - $time;
+				
 				if($time < 0) {
 					$time = abs($time);
 					$isFuture = true;
 				}
+				
 				$tokens = array (31536000 => 'year', 2592000 => 'month', 604800 => 'week', 86400 => 'day', 3600 => 'hour', 60 => 'minute', 1 => 'second');
+				
 				foreach($tokens as $unit => $text) {
 					if($time < $unit) continue;
 					$numberOfUnits = floor($time / $unit);

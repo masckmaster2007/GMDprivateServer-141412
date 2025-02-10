@@ -185,10 +185,19 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `dailyfeatures` LIKE 'webhookSent'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE dailyfeatures ADD webhookSent INT NOT NULL DEFAULT '0' AFTER type");
-	$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isUploadBanned'");
+	$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isBanned'");
 		$exist = $check->fetchAll();
 		if(!empty($exist)) {
-			$allBans = $db->prepare('SELECT userID, isBanned, isCreatorBanned, isUploadBanned, isCommentBanned, banReason FROM users WHERE isBanned > 0 OR isCreatorBanned > 0 OR isUploadBanned > 0 OR isCommentBanned > 0');
+			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isCreatorBanned'");
+			$creatorBanned = $check->fetchAll();
+			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isUploadBanned'");
+			$uploadBanned = $check->fetchAll();
+			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isCommentBanned'");
+			$commentBanned = $check->fetchAll();
+			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'banReason'");
+			$banReason = $check->fetchAll();
+			// Absolutely cursed, but idc, all for full compatibility
+			$allBans = $db->prepare('SELECT userID, isBanned'.(!empty($creatorBanned) ? ', isCreatorBanned' : '').(!empty($uploadBanned) ? ', isUploadBanned' : '').(!empty($commentBanned) ? ', isCommentBanned' : '').(!empty($banReason) ? ', banReason' : '').' FROM users WHERE isBanned > 0'.(!empty($creatorBanned) ? ' OR isCreatorBanned > 0' : '').(!empty($uploadBanned) ? ' OR isUploadBanned > 0' : '').(!empty($commentBanned) ? ' OR isCommentBanned > 0' : ''));
 			$allBans->execute();
 			$allBans = $allBans->fetchAll();
 			foreach($allBans AS &$ban) {
@@ -208,21 +217,11 @@ if(!$installed) {
 						break;
 				}
 			}
-			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isBanned'");
-				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query('ALTER TABLE `users` DROP `isBanned`');
-			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isCreatorBanned'");
-				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query('ALTER TABLE `users` DROP `isCreatorBanned`');
-			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isUploadBanned'");
-				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query('ALTER TABLE `users` DROP `isUploadBanned`');
-			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'isCommentBanned'");
-				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query('ALTER TABLE `users` DROP `isCommentBanned`');
-			$check = $db->query("SHOW COLUMNS FROM `users` LIKE 'banReason'");
-				$exist = $check->fetchAll();
-				if(!empty($exist)) $db->query('ALTER TABLE `users` DROP `banReason`');
+			$db->query('ALTER TABLE `users` DROP `isBanned`');
+			if(!empty($creatorBanned)) $db->query('ALTER TABLE `users` DROP `isCreatorBanned`');
+			if(!empty($uploadBanned)) $db->query('ALTER TABLE `users` DROP `isUploadBanned`');
+			if(!empty($commentBanned)) $db->query('ALTER TABLE `users` DROP `isCommentBanned`');
+			if(!empty($banReason)) $db->query('ALTER TABLE `users` DROP `banReason`');
 		}
 	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'profilecommandDiscord'");
 		$exist = $check->fetchAll();
@@ -432,6 +431,21 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'commandSuggest'");
 		$exist = $check->fetchAll();
 		if(empty($exist)) $db->query("ALTER TABLE `roles` ADD `commandSuggest` INT NOT NULL DEFAULT '0' AFTER `commandEvent`");
+	$check = $db->query("SHOW COLUMNS FROM `modactions` LIKE 'IP'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `modactions` ADD `IP` VARCHAR(255) NOT NULL DEFAULT '' AFTER `value7`");
+	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'userName'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `messages` DROP `userName`");
+	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'userID'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `messages` DROP `userID`");
+	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'accID'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `messages` CHANGE `accID` `accountID` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'toAccountID'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `messages` CHANGE `toAccountID` `toAccountID` VARCHAR(255) NOT NULL DEFAULT ''");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);
