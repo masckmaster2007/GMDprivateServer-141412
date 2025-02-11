@@ -116,11 +116,18 @@ class Security {
 		require_once __DIR__."/exploitPatch.php";
 		require_once __DIR__."/enums.php";
 		
-		if(isset($_POST['userName'])) {
-			$userName = Escape::latin($_POST['userName']);
-			$accountID = Library::getAccountIDWithUserName($userName);
-		} else {
-			$accountID = Escape::number($_POST['accountID']);
+		switch(true) {
+			case isset($_POST['userName']):
+				$userName = Escape::latin($_POST['userName']);
+				$accountID = Library::getAccountIDWithUserName($userName);
+				break;
+			case isset($_POST['uuid']):
+				$userID = Escape::number($_POST['uuid']);
+				$accountID = Library::getAccountID($userID);
+				break;
+			default:
+				$accountID = Escape::number($_POST['accountID']);
+				break;
 		}
 		
 		$loginType = self::getLoginType();

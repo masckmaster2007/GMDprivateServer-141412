@@ -753,8 +753,6 @@ class Library {
 	}
 	
 	public static function canSendMessage($person, $toAccountID) {
-		require __DIR__."/connection.php";
-		
 		if(isset($GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID];
 		
 		if($person['accountID'] == $toAccountID) {
@@ -774,7 +772,7 @@ class Library {
 			return false;
 		}
 		
-		$isBlocked = self::isPersonBlocked($person['accountID'], $toAccountID);
+		$isBlocked = self::isPersonBlocked($toAccountID, $person['accountID']);
 		if($isBlocked) {
 			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
 			return false;
@@ -790,27 +788,30 @@ class Library {
 					$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
 					return false;
 				}
-				
 				break;
 		}
 				
 		// Automod here
 		
 		$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = true;
-		
 		return true;
 	}
 	
 	public static function isPersonBlocked($accountID, $targetAccountID) {
 		require __DIR__."/connection.php";
 		
-		if(isset($GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID];
+		if(isset($GLOBALS['core_cache']['personBlocked'][$accountID][$targetAccountID])) return $GLOBALS['core_cache']['personBlocked'][$accountID][$targetAccountID];
 		
-		$isBlocked = $db->prepare("SELECT count(*) FROM blocks WHERE person1 = :accountID AND person2 = :targetAccountID");
+		if($accountID == $targetAccountID) {
+			$GLOBALS['core_cache']['personBlocked'][$accountID][$targetAccountID] = false;
+			return false;
+		}
+		
+		$isBlocked = $db->prepare("SELECT count(*) FROM blocks WHERE (person1 = :accountID AND person2 = :targetAccountID) OR (person1 = :targetAccountID AND person2 = :accountID)");
 		$isBlocked->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
 		$isBlocked = $isBlocked->fetchColumn() > 0;
 		
-		$GLOBALS['core_cache']['personBlocked'][$person['accountID']][$toAccountID] = $isBlocked;
+		$GLOBALS['core_cache']['personBlocked'][$accountID][$targetAccountID] = $isBlocked;
 		
 		return $isBlocked;
 	}
@@ -834,6 +835,239 @@ class Library {
 		$deleteMessages->execute([':accountID' => $accountID]);
 		
 		return true;
+	}
+	
+	public static function canSeeCommentsHistory($person, $targetUserID) {
+		if(isset($GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID])) return $GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID];
+		
+		if($person['userID'] == $targetUserID) {
+			$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = true;
+			return true;
+		}
+		
+		$account = self::getUserByID($targetUserID);
+		if(!$account) {
+			$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = false;
+			return false;
+		}
+		
+		$isBlocked = self::isPersonBlocked($account['extID'], $person['accountID']);
+		if($isBlocked) {
+			$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = false;
+			return false;
+		}
+
+		switch($account['cS']) {
+			case 2:
+				$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = false;
+				return false;
+			case 1:
+				$isFriends = self::isFriends($person['accountID'], $account['extID']);
+				if(!$isFriends) {
+					$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = false;
+					return false;
+				}
+				break;
+		}
+		
+		$GLOBALS['core_cache']['canSeeCommentsHistory'][$person['userID']][$targetUserID] = true;
+		return true;
+	}
+	
+	public static function getFriendships($accountID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['friendships'][$accountID])) return $GLOBALS['core_cache']['friendships'][$accountID];
+		
+		$friendships = $db->prepare("SELECT * FROM friendships INNER JOIN users ON (person1 = users.extID AND person1 != :accountID) OR (person2 = users.extID AND person2 != :accountID) WHERE person1 = :accountID OR person2 = :accountID ORDER BY users.userName ASC");
+		$friendships->execute([':accountID' => $accountID]);
+		$friendships = $friendships->fetchAll();
+		
+		$readFriendships = $db->prepare("UPDATE friendships SET isNew1 = 0 WHERE person1 = :accountID");
+		$readFriendships->execute([':accountID' => $accountID]);
+		$readFriendships = $db->prepare("UPDATE friendships SET isNew2 = 0 WHERE person2 = :accountID");
+		$readFriendships->execute([':accountID' => $accountID]);
+		
+		$GLOBALS['core_cache']['friendships'][$accountID] = $friendships;
+		
+		return $friendships;
+	}
+	
+	public static function getBlocks($accountID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['blocks'][$accountID])) return $GLOBALS['core_cache']['blocks'][$accountID];
+		
+		$blocks = $db->prepare("SELECT * FROM blocks INNER JOIN users ON blocks.person2 = users.extID WHERE blocks.person1 = :accountID ORDER BY users.userName ASC");
+		$blocks->execute([':accountID' => $accountID]);
+		$blocks = $blocks->fetchAll();
+		
+		$GLOBALS['core_cache']['blocks'][$accountID] = $blocks;
+		
+		return $blocks;
+	}
+	
+	public static function removeFriend($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+		
+		$isFriends = self::isFriends($accountID, $targetAccountID);
+		if(!$isFriends) return false;
+		
+		$removeFriend = $db->prepare("DELETE FROM friendships WHERE (person1 = :accountID AND person2 = :targetAccountID) OR (person1 = :targetAccountID AND person2 = :accountID)");
+		$removeFriend->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		return true;
+	}
+	
+	public static function unblockUser($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+		
+		$isBlocked = self::isPersonBlocked($accountID, $targetAccountID);
+		if(!$isBlocked) return false;
+		
+		$unblockUser = $db->prepare("DELETE FROM blocks WHERE person1 = :accountID AND person2 = :targetAccountID");
+		$unblockUser->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		return true;
+	}
+	
+	public static function getFriendRequests($accountID, $getSent, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['friendRequests'][$accountID])) return $GLOBALS['core_cache']['friendRequests'][$accountID];
+		
+		$friendRequests = $db->prepare("SELECT * FROM friendreqs INNER JOIN users ON (friendreqs.accountID = users.extID AND friendreqs.accountID != :accountID) OR (friendreqs.toAccountID = users.extID AND friendreqs.toAccountID != :accountID) WHERE friendreqs.".($getSent ? 'accountID' : 'toAccountID')." = :accountID ORDER BY friendreqs.uploadDate DESC LIMIT 10 OFFSET ".$pageOffset);
+		$friendRequests->execute([':accountID' => $accountID]);
+		$friendRequests = $friendRequests->fetchAll();
+		
+		$friendRequestsCount = $db->prepare("SELECT count(*) FROM friendreqs WHERE friendreqs.".($getSent ? 'accountID' : 'toAccountID')." = :accountID");
+		$friendRequestsCount->execute([':accountID' => $accountID]);
+		$friendRequestsCount = $friendRequestsCount->fetchColumn();
+		
+		$GLOBALS['core_cache']['friendRequests'][$accountID] = ["requests" => $friendRequests, 'count' => $friendRequestsCount];
+		
+		return ["requests" => $friendRequests, 'count' => $friendRequestsCount];		
+	}
+	
+	public static function canSendFriendRequest($person, $toAccountID) {
+		if(isset($GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID];
+		
+		if($person['accountID'] == $toAccountID) {
+			$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		$account = self::getAccountByID($toAccountID);
+		if(!$account) {
+			$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		if($account['fS']) {
+			$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+
+		$isFriends = self::isFriends($toAccountID, $person['accountID']);
+		if($isFriends) {
+			$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+
+		$isBlocked = self::isPersonBlocked($toAccountID, $person['accountID']);
+		if($isBlocked) {
+			$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = false;
+			return false;
+		}
+		
+		$GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID] = true;
+		return true;
+	}
+	
+	public static function sendFriendRequest($accountID, $toAccountID, $comment) {
+		require __DIR__."/connection.php";
+		
+		$sendFriendRequest = $db->prepare("INSERT INTO friendreqs (accountID, toAccountID, comment, uploadDate)
+			VALUES (:accountID, :toAccountID, :comment, :timestamp)");
+		$sendFriendRequest->execute([':accountID' => $accountID, ':toAccountID' => $toAccountID, ':comment' => $comment, ':timestamp' => time()]);
+		
+		return true;
+	}
+	
+	public static function deleteFriendRequests($accountID, $accounts) {
+		require __DIR__."/connection.php";
+		
+		$deleteFriendRequests = $db->prepare("DELETE FROM friendreqs WHERE (accountID = :accountID AND toAccountID IN (".$accounts.")) OR (toAccountID = :accountID AND accountID IN (".$accounts."))");
+		$deleteFriendRequests->execute([':accountID' => $accountID]);
+		
+		return true;
+	}
+	
+	public static function acceptFriendRequest($accountID, $requestID) {
+		require __DIR__."/connection.php";
+		
+		$getFriendRequest = self::getFriendRequestByID($accountID, $requestID);
+		
+		if($accountID == $getFriendRequest['accountID']) return false;
+		
+		self::deleteFriendRequests($accountID, $getFriendRequest['accountID']);
+		
+		$acceptFriendRequest = $db->prepare("INSERT INTO friendships (person1, person2, isNew1, isNew2)
+			VALUES (:accountID, :targetAccountID, 1, 1)");
+		$acceptFriendRequest->execute([':accountID' => $accountID, ':targetAccountID' => $getFriendRequest['accountID']]);
+		
+		return true;
+	}
+	
+	public static function getFriendRequestByID($accountID, $requestID) {
+		require __DIR__."/connection.php";
+		
+		$friendRequest = $db->prepare("SELECT * FROM friendreqs WHERE toAccountID = :accountID AND ID = :requestID");
+		$friendRequest->execute([':accountID' => $accountID, ':requestID' => $requestID]);
+		$friendRequest = $friendRequest->fetch();
+		
+		return $friendRequest;
+	}
+	
+	public static function blockUser($accountID, $targetAccountID) {
+		require __DIR__."/connection.php";
+		
+		$isBlocked = self::isPersonBlocked($accountID, $targetAccountID);
+		if($isBlocked) return false;
+		
+		$blockUser = $db->prepare("INSERT INTO blocks (person1, person2)
+			VALUES (:accountID, :targetAccountID)");
+		$blockUser->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		self::removeFriend($accountID, $targetAccountID);
+		
+		return true;
+	}
+	
+	public static function readFriendRequest($accountID, $requestID) {
+		require __DIR__."/connection.php";
+		
+		$getFriendRequest = self::getFriendRequestByID($accountID, $requestID);
+		if(!$getFriendRequest) return false;
+		
+		$friendRequest = $db->prepare("UPDATE friendreqs SET isNew = 0 WHERE toAccountID = :accountID AND ID = :requestID");
+		$friendRequest->execute([':accountID' => $accountID, ':requestID' => $requestID]);
+		
+		return true;
+	}
+	
+	public static function getUsers($str, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$users = $db->prepare("SELECT * FROM users WHERE userID = :str OR userName LIKE CONCAT('%', :str, '%') ORDER BY stars DESC LIMIT 10 OFFSET ".$pageOffset);
+		$users->execute([':str' => $str]);
+		$users = $users->fetchAll();
+		
+		$usersCount = $db->prepare("SELECT count(*) FROM users WHERE userID = :str OR userName LIKE CONCAT('%', :str, '%')");
+		$usersCount->execute([':str' => $str]);
+		$usersCount = $usersCount->fetchColumn();
+		
+		return ["users" => $users, 'count' => $usersCount];
 	}
 	
 	/*
@@ -2213,6 +2447,27 @@ class Library {
 		$rateItem->execute([':itemID' => $itemID]);
 		
 		return true;
+	}
+	
+	/*
+		Return to Geometry Dash-related functions
+	*/
+	
+	public static function returnUserString($user) {
+		return "1:".$user["userName"].":2:".$user["userID"].":13:".$user["coins"].":17:".$user["userCoins"].":10:".$user["color1"].":11:".$user["color2"].":51:".$user["color3"].":3:".$user["stars"].":46:".$user["diamonds"].":52:".$user["moons"].":4:".$user["demons"].":8:".$user['creatorPoints'].":18:".$user['messagesState'].":19:".$user['friendRequestsState'].":50:".$user['commentsState'].":20:".$user["youtubeurl"].":21:".$user["accIcon"].":22:".$user["accShip"].":23:".$user["accBall"].":24:".$user["accBird"].":25:".$user["accDart"].":26:".$user["accRobot"].":28:".$user["accGlow"].":43:".$user["accSpider"].":48:".$user["accExplosion"].":53:".$user["accSwing"].":54:".$user["accJetpack"].":30:".$user['rank'].":16:".$user["extID"].":31:".$user['friendsState'].":44:".$user["twitter"].":45:".$user["twitch"].":49:".$user['badge'].":55:".$user["dinfo"].":56:".$user["sinfo"].":57:".$user["pinfo"].$user['incomingRequestText'].":29:".$user['isRegistered'];
+	}
+	
+	public static function returnFriendshipsString($person, $user, $isBlocks) {
+		if(!$isBlocks) {
+			$user['isNew'] = $user['person2'] == $user['extID'] ? $user['isNew1'] : $user['isNew2'];
+			$user['canMessage'] = self::canSendMessage($person, $user['extID']) ? 0 : 2;
+		}
+		
+		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].(!$isBlocks ? ":18:".$user['canMessage'] : '').":41:".$user['isNew'];
+	}
+	
+	public static function returnFriendRequestsString($person, $user) {
+		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":32:".$user["ID"].":35:".$user["comment"].":41:".$user["isNew"].":37:".$user['uploadTime'];
 	}
 }
 ?>

@@ -89,15 +89,15 @@ $minBinaryVersion = 0;
 $maxBinaryVersion = 0;
 
 /*
-	Show levels from newer GD version
+	Show levels from newer Geometry Dash version
 	
-	This setting will allow showing levels if they were posted from newer GD version, than yours
+	This setting will allow showing levels if they were posted from newer Geometry Dash version, than yours
 	
 	True — Show all levels
-	False — Only show levels your GD version support
+	False — Only show levels your Geometry Dash version support
 */
-
 $showAllLevels = true;
+
 /*
 	Amount of stars for leaderboards
 
@@ -186,7 +186,7 @@ $automaticCron = false;
 	
 	Players can mention levels in comments and other places by writing #levelID
 	Example: "Did you play #648? It's cool!"
-	Minor issue is you can't open player's account anymore
+	Minor issue is you couldn't open player's account anymore
 	
 	True — You can mention levels in comments and it will show first mentioned level
 	False — Comments in levels will never show level ID button
@@ -207,4 +207,14 @@ $mentionLevelsInComments = true;
 */
 $normalLevelsVotes = true;
 $demonDifficultiesVotes = true;
+
+/*
+	Search for user and account levels
+	
+	Before Geometry Dash 2.0 players could search levels of other players by searching `uUSER_ID`
+	Should GDPS core allow searching levels that way? This also will enable searching `aACCOUNT_ID`
+	
+	Example: u16, a71
+*/
+$enableUserLevelsSearching = true;
 ?>

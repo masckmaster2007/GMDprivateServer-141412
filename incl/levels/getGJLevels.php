@@ -128,15 +128,24 @@ switch($type) {
 				)"];
 				$isIDSearch = true;
 			} else {
-				$firstCharacter = substr($str, 0, 1);
-				if($firstCharacter == 'u') {
-					$potentialUserID = substr($str, 1);
-					if(is_numeric($potentialUserID)) {
-						$filters[] = "userID = ".$potentialUserID;
+				$firstCharacter = $enableUserLevelsSearching ? substr($str, 0, 1) : 'd';
+				switch($firstCharacter) {
+					case 'u':
+						$potentialUserID = substr($str, 1);
+						if(is_numeric($potentialUserID)) {
+							$filters[] = "userID = ".$potentialUserID;
+							break;
+						}
+					case 'a':
+						$potentialAccountID = substr($str, 1);
+						if(is_numeric($potentialAccountID)) {
+							$filters[] = "extID = ".$potentialAccountID;
+							break;
+						}
+					default:
+						$filters[] = "levelName LIKE '%".$str."%'";
 						break;
-					}
-				} 
-				$filters[] = "levelName LIKE '%".$str."%'";
+				}
 			}
 		}
 		break;

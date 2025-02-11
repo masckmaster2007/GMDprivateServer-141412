@@ -1,15 +1,27 @@
 <?php
 require_once __DIR__."/../lib/mainLib.php";
+require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
+$sec = new Security();
 
-$accountID = Escape::number($_POST['accountID']);
-$userID = Library::getUserID($accountID);
-if(!$userID) exit(CommonError::InvalidRequest);
+$player = $sec->loginPlayer();
+if(!$player["success"]) exit(CommonError::InvalidRequest);
+$accountID = $player["accountID"];
+$userID = $player["userID"];
+$userName = $player["userName"];
+
+$targetAccountID = Escape::number($_POST['accountID']);
+$targetUserID = Library::getUserID($targetAccountID);
+if(!$targetUserID) exit(CommonError::InvalidRequest);
+
 $page = Escape::number($_POST["page"]) ?? 0;
 $commentsPage = $page * 10;
 
-$accountComments = Library::getAccountComments($userID, $commentsPage);
+$isBlocked = Library::isPersonBlocked($accountID, $targetAccountID);
+if($isBlocked) exit(CommonError::InvalidRequest);
+
+$accountComments = Library::getAccountComments($targetUserID, $commentsPage);
 $echoString = '';
 foreach($accountComments['comments'] AS &$accountComment) {
 	$timestamp = Library::makeTime($accountComment['timestamp']);

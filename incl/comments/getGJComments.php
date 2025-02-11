@@ -2,7 +2,20 @@
 require __DIR__."/../../config/misc.php";
 require_once __DIR__."/../lib/mainLib.php";
 require_once __DIR__."/../lib/exploitPatch.php";
+require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/enums.php";
+$sec = new Security();
+
+$player = $sec->loginPlayer();
+if(!$player["success"]) exit(CommonError::InvalidRequest);
+$accountID = $player["accountID"];
+$userID = $player["userID"];
+$userName = $player["userName"];
+$person = [
+	'accountID' => $accountID,
+	'userID' => $userID,
+	'IP' => $IP
+];
 
 $commentsString = $usersString = "";
 $usersArray = [];
@@ -17,14 +30,21 @@ $pageOffset = $page * $count;
 
 switch(true) {
 	case isset($_POST['levelID']):
-		$levelID = Escape::multiple_ids($_POST['levelID']);
-		$comments = Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset);
 		$displayLevelID = false;
+		
+		$levelID = Escape::multiple_ids($_POST['levelID']);
+		
+		$comments = Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset);
 		break;
 	case isset($_POST['userID']):
-		$userID = Escape::number($_POST['userID']);
-		$comments = Library::getCommentsOfUser($userID, $sortMode, $pageOffset);
 		$displayLevelID = true;
+
+		$targetUserID = Escape::number($_POST['userID']);
+		
+		$canSeeCommentHistory = Library::canSeeCommentsHistory($person, $targetUserID);
+		if(!$canSeeCommentHistory) exit(CommentsError::NothingFound);
+		
+		$comments = Library::getCommentsOfUser($targetUserID, $sortMode, $pageOffset);
 		break;
 	default:
 		exit(CommonError::InvalidRequest);
