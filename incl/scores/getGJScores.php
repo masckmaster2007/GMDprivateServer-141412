@@ -22,7 +22,7 @@ $rank = $leaderboard['rank'];
 foreach($leaderboard['leaderboard'] AS &$user) {
 	$rank++;
 	
-	//$user["userName"] = $gs->makeClanUsername($user);
+	$user["userName"] = Library::makeClanUsername($user['extID']);
 	
 	$stars += $user['stars'];
 	$demons += $user['demons'];

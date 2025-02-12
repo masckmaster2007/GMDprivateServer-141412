@@ -2,24 +2,25 @@
 require_once __DIR__."/../lib/mainLib.php";
 require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/security.php";
+require_once __DIR__."/../lib/ip.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
 $player = $sec->loginPlayer();
 if(!$player["success"]) exit(CommonError::InvalidRequest);
+$IP = IP::getIP();
 $accountID = $player["accountID"];
 $userID = $player["userID"];
 $userName = $player["userName"];
+$person = [
+	'accountID' => $accountID,
+	'userID' => $userID,
+	'IP' => $IP
+];
 
-$usersString = '';
-$str = Escape::text($_POST["str"]);
-$page = Escape::number($_POST["page"]);
-$pageOffset = $page * 10;
+$appearance = Library::getPersonCommentAppearance($person);
 
-$users = Library::getUsers($str, $pageOffset);
-if(!$users['users']) exit(CommonError::InvalidRequest);
+$badge = min(2, $appearance['modBadgeLevel']);
 
-foreach($users['users'] AS &$user) $usersString .= Library::returnUserString($user)."|";
-
-exit(rtrim($usersString, "|")."#".$users['count'].":".$pageOffset.":10");
+exit((string)$badge);
 ?>

@@ -34,7 +34,7 @@ switch(true) {
 		
 		$levelID = Escape::multiple_ids($_POST['levelID']);
 		
-		$comments = Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset);
+		$comments = $levelID > 0 ? Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset) : Library::getCommentsOfList(($levelID * -1), $sortMode, $pageOffset);
 		break;
 	case isset($_POST['userID']):
 		$displayLevelID = true;
@@ -54,7 +54,10 @@ if(empty($comments['comments'])) exit(CommentsError::NothingFound);
 
 foreach($comments['comments'] AS &$comment) {
 	$extraTextArray = [];
-	if($comment['userID'] == $comment['levelUserID']) $extraTextArray[] = 'Creator';
+	
+	if(!$comment['extID']) $comment['extID'] = Library::getAccountID($comment['userID']);
+	
+	if($comment['userID'] == $comment['levelUserID'] || $comment['extID'] == $comment['levelAccountID']) $extraTextArray[] = 'Creator';
 	
 	$comment['comment'] = Escape::translit(Escape::url_base64_decode($comment["comment"]));
 	$showLevelID = $displayLevelID ? $comment["levelID"] : Library::getFirstMentionedLevel($comment['comment']);
@@ -65,6 +68,9 @@ foreach($comments['comments'] AS &$comment) {
 	if($likes < -2) $comment["isSpam"] = 1;
 	
 	$user = Library::getUserByID($comment['userID']);
+	
+	$user["userName"] = Library::makeClanUsername($user["extID"]);
+	
 	if($binaryVersion > 31) {
 		$person = [
 			'accountID' => $user['extID'],

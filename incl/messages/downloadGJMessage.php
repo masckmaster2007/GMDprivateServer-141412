@@ -19,7 +19,7 @@ if(!$message) exit(CommonError::InvalidRequest);
 
 $uploadDate = Library::makeTime($message["timestamp"]);
 
-//$message["userName"] = $gs->makeClanUsername($message);
+$message["userName"] = Library::makeClanUsername($message['extID']);
 
 exit("6:".$message["userName"].":3:".$message["userID"].":2:".$message["extID"].":1:".$message["messageID"].":4:".$message["subject"].":8:".$message["isNew"].":9:".$isSender.":5:".$message["body"].":7:".$uploadDate);
 ?>

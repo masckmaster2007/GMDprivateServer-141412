@@ -47,20 +47,12 @@ if(isset($_POST["twoPlayer"]) && $_POST["twoPlayer"] == 1) $filters[] = "twoPlay
 if(isset($_POST["star"]) && $_POST["star"] == 1) $filters[] = "NOT starStars = 0";
 if(isset($_POST["noStar"]) && $_POST["noStar"] == 1) $filters[] = "starStars = 0";
 if(isset($_POST["gauntlet"]) && $_POST["gauntlet"] != 0) {
-	$orderSorting = 'ASC';
 	$gauntletID = Escape::number($_POST["gauntlet"]);
+	
 	$gauntlet = Library::getGauntletByID($gauntletID);
-	$str = $gauntlet["level"].",".$gauntlet["level2"].",".$gauntlet["level3"].",".$gauntlet["level4"].",".$gauntlet["level5"];
-	// https://github.com/Cvolton/GMDprivateServer/pull/935
-	$order = 'CASE
-		WHEN levelID = '.$gauntlet["level"].' THEN 1
-		WHEN levelID = '.$gauntlet["level2"].' THEN 2
-		WHEN levelID = '.$gauntlet["level3"].' THEN 3
-		WHEN levelID = '.$gauntlet["level4"].' THEN 4
-		WHEN levelID = '.$gauntlet["level5"].' THEN 5
-	END';
-	$filters[] = "levelID IN (".$str.")";
-	$type = '-1';
+	$str = $gauntlet["level1"].",".$gauntlet["level2"].",".$gauntlet["level3"].",".$gauntlet["level4"].",".$gauntlet["level5"];
+
+	$type = 10;
 }
 $len = Escape::multiple_ids($_POST["len"]) ?: '-';
 if($len != "-" AND !empty($len)) $filters[] = "levelLength IN (".$len.")";
@@ -111,8 +103,9 @@ switch($diff) {
 }
 
 // Type detection
-if(isset($_POST["str"])) $str = Escape::text($_POST["str"]) ?: '';
+$str = Escape::text($_POST["str"]) ?: '';
 $pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"])."0" : 0;
+
 switch($type) {
 	case 0: // Search
 	case 15: // Most liked, changed to 15 in GDW for whatever reason
@@ -179,8 +172,21 @@ switch($type) {
 		break;
 	case 10: // Map Packs
 	case 19: // Unknown, but same as Map Packs (on real GD type 10 has star rated filter and 19 doesn't)
-		$order = false;
-		$filters[] = "levelID IN (".$str.")";
+		$levelsArray = explode(',', $str);
+		$levelsText = '';
+		
+		foreach($levelsArray AS $levelKey => $levelID) $levelsText .= 'WHEN levelID = '.$levelID.' THEN '.($levelKey + 1).PHP_EOL;
+		
+		$order = 'CASE
+			'.$levelsText.'
+		END';
+		$orderSorting = 'ASC';
+		
+		$friendsArray = Library::getFriends($accountID);
+		$friendsArray[] = $accountID;
+		$friendsString = implode(",", $friendsArray);
+		
+		$filters[] = "levelID IN (".$str.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")))";
 		break;
 	case 11: // Awarded
 		$filters[] = "NOT starStars = 0";
@@ -215,6 +221,7 @@ switch($type) {
 		$friendsArray = Library::getFriends($accountID);
 		$friendsArray[] = $accountID;
 		$friendsString = implode(",", $friendsArray);
+		
 		$filters = ["levelID IN (".$listLevels.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")))"];
 		break;
 	case 27: // Sent levels

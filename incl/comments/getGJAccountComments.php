@@ -25,8 +25,10 @@ $accountComments = Library::getAccountComments($targetUserID, $commentsPage);
 $echoString = '';
 foreach($accountComments['comments'] AS &$accountComment) {
 	$timestamp = Library::makeTime($accountComment['timestamp']);
+	
 	$likes = $accountComment['likes'] - $accountComment['dislikes'];
 	$accountComment['comment'] = Escape::url_base64_encode(Escape::translit(Escape::url_base64_decode($accountComment['comment'])));
+	
 	$echoString .= "2~".$accountComment["comment"]."~3~".$accountComment["userID"]."~4~".$likes."~5~0~7~".$accountComment["isSpam"]."~9~".$timestamp."~6~".$accountComment["commentID"]."|";
 }
 $echoString = rtrim($echoString, "|");

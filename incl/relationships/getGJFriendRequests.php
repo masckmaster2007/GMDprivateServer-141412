@@ -29,8 +29,10 @@ if(empty($friendRequests['requests'])) exit(CommentsError::NothingFound);
 
 foreach($friendRequests['requests'] AS &$request) {
 	$uploadTime = Library::makeTime($request["uploadDate"]);
-	//$request["userName"] = $gs->makeClanUsername($user);
+	
+	$request["userName"] = Library::makeClanUsername($request['extID']);
 	$request["comment"] = Escape::url_base64_encode(Escape::translit(Escape::url_base64_decode($request["comment"])));
+	
 	$friendRequestsString .= Library::returnFriendRequestsString($person, $request)."|";
 }
 

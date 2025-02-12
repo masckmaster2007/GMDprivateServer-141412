@@ -27,12 +27,18 @@ $percent = Escape::number($_POST['percent']) ?: 0;
 if(empty($comment)) exit(CommonError::InvalidRequest);
 
 if($gameVersion >= 20) $comment = Escape::url_base64_decode($comment);
+if($levelID > 0) {
+	$level = Library::getLevelByID($levelID);
+	if(!$level) exit(CommonError::InvalidRequest);
 
-$level = Library::getLevelByID($levelID);
-if(!$level) exit(CommonError::InvalidRequest);
-
-$command = Commands::processLevelCommand($comment, $level, $person);
-if($command) exit(Library::showCommentsBanScreen($command, 0));
+	$command = Commands::processLevelCommand($comment, $level, $person);
+	if($command) exit(Library::showCommentsBanScreen($command, 0));
+	
+	
+} else {
+	$listID = $levelID * -1;
+	$list = Library::getListByID($listID);
+}
 
 $ableToComment = Library::isAbleToComment($levelID, $accountID, $userID, $IP);
 if(!$ableToComment['success']) {
@@ -42,7 +48,7 @@ if(!$ableToComment['success']) {
 		
 			exit(Library::showCommentsBanScreen(Escape::translit(Escape::url_base64_decode($ableToComment['info']['reason'])), $ableToComment['info']['expires']));
 		default:
-			exit(Library::showCommentsBanScreen("Commenting on this level is currently disabled!", 0));
+			exit(Library::showCommentsBanScreen("Commenting on this ".($levelID > 0 ? 'level' : 'list')." is currently disabled!", 0));
 	}
 }
 

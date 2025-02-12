@@ -37,6 +37,10 @@ $installed = true; // Like i said, it changed!
 	$preenableSongs — should core autoenable SFXs when uploading new one?
 		True — enable new SFXs
 		False — disable new SFXs (requires moderator input to enable)
+	$clansTagPosition — how clan tag should display in-game
+		%1$s — username
+		%2$s — clan tag
+		%1$s [%2$s] -> USERNAME [TAG], for example: Sa1ntSosetHui [GCS]
 */
 $gdps = "GDPS";
 $lrEnabled = true;
@@ -52,6 +56,7 @@ $dashboardIcon = '/dashboard/icon.png';
 $dashboardFavicon = '/dashboard/icon.png';
 $preenableSongs = true;
 $preenableSFXs = true;
+$clansTagPosition = '%1$s [%2$s]';
 
 /*
 	Download links

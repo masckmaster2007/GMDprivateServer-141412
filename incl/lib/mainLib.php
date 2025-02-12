@@ -164,6 +164,20 @@ class Library {
 		return $user;
 	}
 	
+	public static function getUserByAccountID($extID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['user']['extID'][$extID])) return $GLOBALS['core_cache']['user']['extID'][$extID];
+		
+		$user = $db->prepare("SELECT * FROM users WHERE extID = :extID");
+		$user->execute([':extID' => $extID]);
+		$user = $user->fetch();
+		
+		$GLOBALS['core_cache']['user']['extID'][$extID] = $user;
+		
+		return $user;
+	}
+	
 	public static function getUserByUserName($userName) {
 		require __DIR__."/connection.php";
 		
@@ -276,7 +290,7 @@ class Library {
 	}
 	
 	public static function getUserString($user) {
-		//$user['userName'] = Library::makeClanUsername($user);
+		$user['userName'] = Library::makeClanUsername($user['extID']);
 		return $user['userID'].':'.$user["userName"].':'.$user['extID'];
 	}
 	
@@ -1070,6 +1084,57 @@ class Library {
 		return ["users" => $users, 'count' => $usersCount];
 	}
 	
+	public static function getQuests() {
+		require __DIR__."/connection.php";
+		
+		$quests = $db->prepare("SELECT * FROM quests");
+		$quests->execute();
+		$quests = $quests->fetchAll();
+		shuffle($quests);
+		
+		return $quests;
+	}
+	
+	public static function getVaultCode($code) {
+		require __DIR__."/connection.php";
+
+		if(isset($GLOBALS['core_cache']['vaultCode'][$code])) return $GLOBALS['core_cache']['vaultCode'][$code];
+
+		$vaultCode = $db->prepare('SELECT * FROM vaultcodes WHERE code = :code');
+		$vaultCode->execute([':code' => base64_encode($code)]);
+		$vaultCode = $vaultCode->fetch();
+		
+		$GLOBALS['core_cache']['vaultCode'][$code] = $vaultCode;
+		
+		return $vaultCode;
+	}
+	
+	public static function isVaultCodeUsed($accountID, $rewardID) {
+		require __DIR__."/connection.php";
+		
+		$isVaultCodeUsed = $db->prepare("SELECT count(*) FROM actions WHERE type = 38 AND value = :vaultCode AND account = :accountID");
+		$isVaultCodeUsed->execute([':vaultCode' => $rewardID, ':accountID' => $accountID]);
+		$isVaultCodeUsed = $isVaultCodeUsed->fetchColumn() > 0;
+		
+		return $isVaultCodeUsed;
+	}
+	
+	public static function useVaultCode($accountID, $vaultCode, $code) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		if($vaultCode['uses'] == 0) return false;
+		
+		$reduceUses = $db->prepare('UPDATE vaultcodes SET uses = uses - 1 WHERE rewardID = :rewardID');
+		$reduceUses->execute([':rewardID' => $vaultCode['rewardID']]);
+		
+		Library::logAction($accountID, $IP, 38, $vaultCode['rewardID'], $vaultCode['rewards'], $code);
+		
+		return true;
+	}
+	
 	/*
 		Levels-related functions
 	*/
@@ -1163,7 +1228,7 @@ class Library {
 	public static function getLevels($filters, $order, $orderSorting, $queryJoin, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(") AND (", $filters).") AND isDeleted = 0 ORDER BY ".$order." ".$orderSorting." LIMIT 10 OFFSET ".$pageOffset);
+		$levels = $db->prepare("SELECT * FROM levels ".$queryJoin." WHERE (".implode(") AND (", $filters).") AND isDeleted = 0 ".($order ? "ORDER BY ".$order." ".$orderSorting : "")." LIMIT 10 OFFSET ".$pageOffset);
 		$levels->execute();
 		$levels = $levels->fetchAll();
 		
@@ -1605,13 +1670,13 @@ class Library {
 		return true;
 	}
 	
-	public static function deleteComment($userID, $commentID) {
+	public static function deleteComment($person, $commentID) {
 		require __DIR__."/connection.php";
 		
 		$getComment = $db->prepare("SELECT count(*) FROM comments WHERE userID = :userID AND commentID = :commentID");
-		$getComment->execute([':userID' => $userID, ':commentID' => $commentID]);
+		$getComment->execute([':userID' => $person['userID'], ':commentID' => $commentID]);
 		$getComment = $getComment->fetchColumn();
-		if(!$getComment) return false;
+		if(!$getComment && !self::checkPermission($person, 'actionDeleteComment')) return false;
 		
 		$deleteComment = $db->prepare("DELETE FROM comments WHERE commentID = :commentID");
 		$deleteComment->execute([':commentID' => $commentID]);
@@ -1709,8 +1774,8 @@ class Library {
 		$checkBan = self::getPersonBan($accountID, $userID, 3, $IP);
 		if($checkBan) return ["success" => false, "error" => CommonError::Banned, "info" => $checkBan];
 
-		$level = self::getLevelByID($levelID);
-		if($level['commentLocked']) return ["success" => false, "error" => CommonError::Disabled];
+		$item = $levelID > 0 ? self::getLevelByID($levelID) : self::getListByID($levelID * -1);
+		if($item['commentLocked']) return ["success" => false, "error" => CommonError::Disabled];
 		
 		// Automod here
 		
@@ -1748,6 +1813,143 @@ class Library {
 		$GLOBALS['core_cache']['listLevels'][$listID] = $listLevels;
 
 		return $listLevels;
+	}
+	
+	public static function getMapPacks($pageOffset) {
+		require __DIR__."/../../config/misc.php";
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['mapPacks'])) return $GLOBALS['core_cache']['mapPacks'];
+		
+		$mapPacks = $db->prepare("SELECT * FROM mappacks ORDER BY ".($orderMapPacksByStars ? 'stars' : 'ID')." ASC LIMIT 10 OFFSET ".$pageOffset);
+		$mapPacks->execute();
+		$mapPacks = $mapPacks->fetchAll();
+		
+		$mapPacksCount = $db->prepare("SELECT count(*) FROM mappacks");
+		$mapPacksCount->execute();
+		$mapPacksCount = $mapPacksCount->fetchColumn();
+		
+		$GLOBALS['core_cache']['mapPacks'] = ['mapPacks' => $mapPacks, 'count' => $mapPacksCount];
+		
+		return ['mapPacks' => $mapPacks, 'count' => $mapPacksCount];
+	}
+	
+	public static function getGauntlets() {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['gauntlets'])) return $GLOBALS['core_cache']['gauntlets'];
+		
+		$gauntlets = $db->prepare("SELECT * FROM gauntlets ORDER BY ID ASC");
+		$gauntlets->execute();
+		$gauntlets = $gauntlets->fetchAll();
+		
+		$GLOBALS['core_cache']['gauntlets'] = $gauntlets;
+	
+		return $gauntlets;
+	}
+	
+	public static function getLists($accountID, $filters, $order, $pageOffset) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$lists = $db->prepare("SELECT * FROM lists WHERE (".implode(") AND (", $filters).") ".($order ? "ORDER BY ".$order." DESC" : "")." LIMIT 10 OFFSET ".$pageOffset);
+		$lists->execute();
+		$lists = $lists->fetchAll();
+		
+		$listsCount = $db->prepare("SELECT count(*) FROM lists WHERE (".implode(" ) AND ( ", $filters).")");
+		$listsCount->execute();
+		$listsCount = $listsCount->fetchColumn();
+		
+		foreach($lists AS $listKey => $list) {
+			$addDownload = Library::addDownloadToList($accountID, $IP, $list['listID']);
+			if($addDownload) $lists[$listKey]['downloads']++;
+		}
+		
+		return ["lists" => $lists, "count" => $listsCount];
+	}
+	
+	public static function addDownloadToList($accountID, $IP, $listID) {
+		require __DIR__."/connection.php";
+		
+		$getDownloads = $db->prepare("SELECT count(*) FROM actions_downloads WHERE levelID = :listID AND (ip = INET6_ATON(:IP) OR accountID = :accountID)");
+		$getDownloads->execute([':listID' => ($listID * -1), ':IP' => $IP, ':accountID' => $accountID]);
+		$getDownloads = $getDownloads->fetchColumn();
+		if($getDownloads) return false;
+		
+		$addDownload = $db->prepare("UPDATE lists SET downloads = downloads + 1 WHERE listID = :listID");
+		$addDownload->execute([':listID' => $listID]);
+		$insertAction = $db->prepare("INSERT INTO actions_downloads (levelID, ip, accountID)
+			VALUES (:listID, INET6_ATON(:IP), :accountID)");
+		$insertAction->execute([':listID' => ($listID * -1), ':IP' => $IP, ':accountID' => $accountID]);
+		
+		return true;
+	}
+	
+	public static function getListByID($listID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['lists'][$listID])) return $GLOBALS['core_cache']['lists'][$listID];
+		
+		$list = $db->prepare('SELECT * FROM lists WHERE listID = :listID');
+		$list->execute([':listID' => $listID]);
+		$list = $list->fetch();
+		
+		$GLOBALS['core_cache']['lists'][$listID] = $list;
+		
+		return $list;
+	}
+	
+	public static function getCommentsOfList($listID, $sortMode, $pageOffset) {
+		require __DIR__."/connection.php";
+		
+		$comments = $db->prepare("SELECT *, lists.accountID AS levelAccountID FROM lists INNER JOIN comments ON comments.levelID = (lists.listID * -1) WHERE lists.listID = :listID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments->execute([':listID' => $listID]);
+		$comments = $comments->fetchAll();
+		
+		$commentsCount = $db->prepare("SELECT count(*) FROM lists INNER JOIN comments ON comments.levelID = (lists.listID * -1) WHERE lists.listID = :listID");
+		$commentsCount->execute([':listID' => $listID]);
+		$commentsCount = $commentsCount->fetchColumn();
+		
+		return ["comments" => $comments, "count" => $commentsCount];
+	}
+	
+	public static function uploadList($accountID, $listID, $listDetails) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		if($listID != 0) {
+			$list = Library::getListByID($listID);
+			if(!$list || $list['accountID'] != $accountID) return false;
+			
+			$updateList = $db->prepare('UPDATE lists SET listDesc = :listDesc, listVersion = listVersion + 1, listlevels = :listlevels, starDifficulty = :difficulty, original = :original, unlisted = :unlisted, updateDate = :timestamp WHERE listID = :listID');
+			$updateList->execute([':listID' => $listID, ':listDesc' => $listDetails['listDesc'], ':listlevels' => $listDetails['listLevels'], ':difficulty' => $listDetails['difficulty'], ':original' => $listDetails['original'], ':unlisted' => $listDetails['unlisted'], ':timestamp' => time()]);
+			
+			self::logAction($accountID, $IP, 18, $listDetails['listName'], $listDetails['listLevels'], $listID, $listDetails['difficulty'], $listDetails['unlisted']);
+			//$gs->sendLogsListChangeWebhook($listID, $accountID, $list);
+			return $listID;
+		}
+		
+		$list = $db->prepare('INSERT INTO lists (listName, listDesc, listVersion, accountID, listlevels, starDifficulty, original, unlisted, uploadDate) VALUES (:listName, :listDesc, 1, :accountID, :listlevels, :difficulty, :original, :unlisted, :timestamp)');
+		$list->execute([':listName' => $listDetails['listName'], ':listDesc' => $listDetails['listDesc'], ':accountID' => $accountID, ':listlevels' => $listDetails['listLevels'], ':difficulty' => $listDetails['difficulty'], ':original' => $listDetails['original'], ':unlisted' => $listDetails['unlisted'], ':timestamp' => time()]);
+		$listID = $db->lastInsertId();
+		
+		return $listID;
+	}
+	
+	public static function deleteList($accountID, $listID) {
+		require __DIR__."/connection.php";
+		
+		$list = self::getListByID($listID);
+		if(!$list || $list['accountID'] != $accountID) return false;
+		
+		$deleteList = $db->prepare("DELETE FROM lists WHERE listID = :listID");
+		$deleteList->execute([':listID' => $listID]);
+		
+		return true;
 	}
 	
 	/*
@@ -2449,11 +2651,56 @@ class Library {
 		return true;
 	}
 	
+	public static function getClanInfo($clan, $column = "*") {
+	    require __DIR__ . "/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['clan'][$clan])) {
+			if($column != "*" && $GLOBALS['core_cache']['clan'][$clan]) return $GLOBALS['core_cache']['clan'][$clan][$column];
+			return $GLOBALS['core_cache']['clan'][$clan];
+		}
+
+	    $clanInfo = $db->prepare("SELECT * FROM clans WHERE ID = :clanID");
+	    $clanInfo->execute([':clanID' => $clan]);
+	    $clanInfo = $clanInfo->fetch();
+
+	    if(empty($clanInfo)) {
+			$GLOBALS['core_cache']['clan'][$clan] = false;
+			return false;
+		}
+
+		$clanInfo['clan'] = base64_decode($clanInfo["clan"]);
+		$clanInfo['tag'] = base64_decode($clanInfo["tag"]);
+		$clanInfo['desc'] = base64_decode($clanInfo["desc"]);
+
+		$GLOBALS['core_cache']['clan'][$clan] = $clanInfo;
+
+		if($column != "*") return $clanInfo[$column];
+		
+		return ["ID" => $clanInfo["ID"], "clan" => $clanInfo["clan"], "tag" => $clanInfo["tag"], "desc" => $clanInfo["desc"], "clanOwner" => $clanInfo["clanOwner"], "color" => $clanInfo["color"], "isClosed" => $clanInfo["isClosed"], "creationDate" => $clanInfo["creationDate"]];
+	}
+	
+	public static function makeClanUsername($accountID) {
+		require __DIR__."/../../config/dashboard.php";
+		
+		if(!isset($clansTagPosition)) $clansTagPosition = '[%2$s] %1$s';
+		
+		$user = self::getUserByAccountID($accountID);
+		
+		if($clansEnabled && $user['clan'] > 0 && !isset($_REQUEST['noClan'])) {
+			$clan = self::getClanInfo($user['clan'], 'tag');
+			if(!empty($clan)) return sprintf($clansTagPosition, $user['userName'], $clan);
+		}
+		
+		return $user['userName'];
+	}
+	
 	/*
 		Return to Geometry Dash-related functions
 	*/
 	
 	public static function returnUserString($user) {
+		$user['userName'] = self::makeClanUsername($user['extID']);
+		
 		return "1:".$user["userName"].":2:".$user["userID"].":13:".$user["coins"].":17:".$user["userCoins"].":10:".$user["color1"].":11:".$user["color2"].":51:".$user["color3"].":3:".$user["stars"].":46:".$user["diamonds"].":52:".$user["moons"].":4:".$user["demons"].":8:".$user['creatorPoints'].":18:".$user['messagesState'].":19:".$user['friendRequestsState'].":50:".$user['commentsState'].":20:".$user["youtubeurl"].":21:".$user["accIcon"].":22:".$user["accShip"].":23:".$user["accBall"].":24:".$user["accBird"].":25:".$user["accDart"].":26:".$user["accRobot"].":28:".$user["accGlow"].":43:".$user["accSpider"].":48:".$user["accExplosion"].":53:".$user["accSwing"].":54:".$user["accJetpack"].":30:".$user['rank'].":16:".$user["extID"].":31:".$user['friendsState'].":44:".$user["twitter"].":45:".$user["twitch"].":49:".$user['badge'].":55:".$user["dinfo"].":56:".$user["sinfo"].":57:".$user["pinfo"].$user['incomingRequestText'].":29:".$user['isRegistered'];
 	}
 	
@@ -2463,10 +2710,14 @@ class Library {
 			$user['canMessage'] = self::canSendMessage($person, $user['extID']) ? 0 : 2;
 		}
 		
+		$user['userName'] = self::makeClanUsername($user['extID']);
+		
 		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].(!$isBlocks ? ":18:".$user['canMessage'] : '').":41:".$user['isNew'];
 	}
 	
 	public static function returnFriendRequestsString($person, $user) {
+		$user['userName'] = self::makeClanUsername($user['extID']);
+		
 		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":32:".$user["ID"].":35:".$user["comment"].":41:".$user["isNew"].":37:".$user['uploadTime'];
 	}
 }
