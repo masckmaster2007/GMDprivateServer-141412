@@ -5,17 +5,15 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person['accountID'];
 
-$targetAccountID = Escape::number($_POST['accountID']);
+$targetAccountID = Escape::latin_no_spaces($_POST['accountID']);
 $targetUserID = Library::getUserID($targetAccountID);
 if(!$targetUserID) exit(CommonError::InvalidRequest);
 
-$page = Escape::number($_POST["page"]) ?? 0;
+$page = Escape::number($_POST["page"]) ?: 0;
 $commentsPage = $page * 10;
 
 $isBlocked = Library::isPersonBlocked($accountID, $targetAccountID);

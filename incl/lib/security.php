@@ -11,22 +11,25 @@ class Security {
 	public function loginToAccountWithID($accountID, $key, $type) {
 		require_once __DIR__."/mainLib.php";
 		require_once __DIR__."/enums.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
 		
 		$account = Library::getAccountByID($accountID);
-		if(!$account) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
+		if(!$account) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID, "IP" => $IP];
 		
 		switch($type) {
 			case 1:
-				if(!password_verify($key, $account["password"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
+				if(!password_verify($key, $account["password"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID, "IP" => $IP];
 				break;
 			case 2:
-				if(!password_verify($key, $account["gjp2"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
+				if(!password_verify($key, $account["gjp2"])) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID, "IP" => $IP];
 				break;
 			case 3:
-				if(empty(trim($key)) || $key != $account["auth"]) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID];
+				if(empty(trim($key)) || $key != $account["auth"]) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)$accountID, "IP" => $IP];
 				break;
 		}		
-		if($account["isActive"] == "0") return ["success" => false, "error" => LoginError::AccountIsNotActivated, "accountID" => (string)$accountID];
+		if($account["isActive"] == "0") return ["success" => false, "error" => LoginError::AccountIsNotActivated, "accountID" => (string)$accountID, "IP" => $IP];
 		
 		$userID = Library::getUserID($accountID);
 		
@@ -40,7 +43,7 @@ class Security {
 		
 		self::updateLastPlayed($userID);
 		
-		return ["success" => true, "accountID" => (string)$accountID, "userID" => (string)$userID, "userName" => (string)$userName];
+		return ["success" => true, "accountID" => (string)$accountID, "userID" => (string)$userID, "userName" => (string)$userName, "IP" => $IP];
 	}
 	
 	public function loginToAccountWithUserName($userName, $key, $type) {
@@ -74,13 +77,13 @@ class Security {
 	
 	public function encryptFile($filePath, $salt) {
 		$file = file_get_contents($filePath);
-		$fileEncrypted = self::encryptData($filePath, $file, $salt);
+		$fileEncrypted = self::encryptData($file, $salt);
+		file_put_contents($filePath, $fileEncrypted);
 	}
 	
-	public static function encryptData($filePath, $data, $salt) {
+	public static function encryptData($data, $salt) {
 		$cipherMethod = self::getMainCipherMethod();
 		$fileEncrypted = openssl_encrypt($data, $cipherMethod, $salt);
-		file_put_contents($filePath, $fileEncrypted);
 		return $fileEncrypted;
 	}
 	
@@ -135,7 +138,7 @@ class Security {
 
 		$loginToAccount = $this->loginToAccountWithID($accountID, $loginType["key"], $loginType["type"]);
 		if(!$loginToAccount['success']) return ["success" => false, "error" => $loginToAccount['error'], "accountID" => $accountID];
-		return ["success" => true, "accountID" => $loginToAccount['accountID'], "userID" => $loginToAccount['userID'], "userName" => $loginToAccount["userName"]];
+		return ["success" => true, "accountID" => $loginToAccount['accountID'], "userID" => $loginToAccount['userID'], "userName" => $loginToAccount["userName"], "IP" => $loginToAccount['IP']];
 	}
 	
 	public static function updateLastPlayed($userID) {
@@ -174,12 +177,12 @@ class Security {
 		return sha1($levelString."xI25fpAapCQg");
 	}
 	
-	public static function generateThirdHash($lvlsmultistring) {
-		return sha1($lvlsmultistring . "oC36fpYaPtdg");
+	public static function generateThirdHash($levelString) {
+		return sha1($levelString."oC36fpYaPtdg");
 	}
 	
-	public static function generateFourthHash($lvlsmultistring){
-		return sha1($lvlsmultistring . "pC26fpYaQCtg");
+	public static function generateFourthHash($levelString){
+		return sha1($levelString."pC26fpYaQCtg");
 	}
 }
 ?>

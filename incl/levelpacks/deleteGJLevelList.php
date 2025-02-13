@@ -5,15 +5,12 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $listID = Escape::number($_POST['listID']);
 
-$deleteList = Library::deleteList($accountID, $listID);
+$deleteList = Library::deleteList($person, $listID);
 if(!$deleteList) exit(CommonError::InvalidRequest);
 
 exit(CommonError::Success);

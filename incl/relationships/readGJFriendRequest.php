@@ -5,15 +5,12 @@ require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $requestID = Escape::number($_POST['requestID']);
 
-$readFriendRequest = Library::readFriendRequest($accountID, $requestID);
+$readFriendRequest = Library::readFriendRequest($person, $requestID);
 if(!$readFriendRequest) exit(CommonError::InvalidRequest);
 
 exit(CommonError::Success);

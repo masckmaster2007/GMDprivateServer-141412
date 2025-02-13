@@ -5,13 +5,11 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person['accountID'];
 
-$targetAccountID = Escape::number($_POST['targetAccountID']);
+$targetAccountID = Escape::latin_no_spaces($_POST['targetAccountID']);
 $targetUserID = Library::getUserID($targetAccountID);
 if(!$targetUserID) exit(CommonError::InvalidRequest);
 
@@ -34,13 +32,13 @@ $user['youtubeurl'] = $account['youtubeurl'];
 $user['twitter'] = $account['twitter'];
 $user['twitch'] = $account['twitch'];
 
-$person = [
-	'accountID' => $user['extID'],
-	'userID' => $user['userID'],
+$playerPerson = [
+	'accountID' => $targetAccountID,
+	'userID' => $targetUserID,
 	'IP' => $user['IP']
 ];
 
-$userAppearance = Library::getPersonCommentAppearance($person);
+$userAppearance = Library::getPersonCommentAppearance($playerPerson);
 $user['badge'] = $userAppearance['modBadgeLevel'];
 
 if($accountID == $targetAccountID) {

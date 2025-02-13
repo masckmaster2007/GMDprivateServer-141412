@@ -6,16 +6,8 @@ require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
-$person = [
-	'accountID' => $accountID,
-	'userID' => $userID,
-	'IP' => $IP
-];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $commentsString = $usersString = "";
 $usersArray = [];
@@ -34,7 +26,22 @@ switch(true) {
 		
 		$levelID = Escape::multiple_ids($_POST['levelID']);
 		
-		$comments = $levelID > 0 ? Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset) : Library::getCommentsOfList(($levelID * -1), $sortMode, $pageOffset);
+		if($levelID > 0) {
+			$level = Library::getLevelByID($levelID);
+			
+			$canSeeComments = Library::canAccountPlayLevel($person, $level);
+			if(!$canSeeComments) exit(CommentsError::NothingFound);
+			
+			$comments = Library::getCommentsOfLevel($levelID, $sortMode, $pageOffset);
+		} else {
+			$listID = $levelID * -1;
+			$list = Library::getListByID($listID);
+			
+			$canSeeComments = Library::canAccountSeeList($person, $list);
+			if(!$canSeeComments) exit(CommentsError::NothingFound);
+			
+			$comments = Library::getCommentsOfList($listID, $sortMode, $pageOffset);
+		}
 		break;
 	case isset($_POST['userID']):
 		$displayLevelID = true;
@@ -72,13 +79,13 @@ foreach($comments['comments'] AS &$comment) {
 	$user["userName"] = Library::makeClanUsername($user["extID"]);
 	
 	if($binaryVersion > 31) {
-		$person = [
+		$playerPerson = [
 			'accountID' => $user['extID'],
 			'userID' => $user['userID'],
 			'IP' => $user['IP'],
 		];
 		
-		$appearance = Library::getPersonCommentAppearance($person);
+		$appearance = Library::getPersonCommentAppearance($playerPerson);
 		if(!empty($appearance['commentsExtraText'])) $extraTextArray[] = $appearance['commentsExtraText'];
 		
 		$personString = "~11~".$appearance['modBadgeLevel'].'~12~'.$appearance['commentColor'].":1~".$user["userName"]."~7~1~9~".$user["icon"]."~10~".$user["color1"]."~11~".$user["color2"]."~14~".$user["iconType"]."~15~".$user["special"]."~16~".$user["extID"];

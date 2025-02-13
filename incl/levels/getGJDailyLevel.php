@@ -7,6 +7,10 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/XOR.php";
 require_once __DIR__."/../lib/cron.php";
 require_once __DIR__."/../lib/enums.php";
+$sec = new Security();
+
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $type = !empty($_POST["type"]) ? $_POST["type"] : (!empty($_POST["weekly"]) ? $_POST["weekly"] : 0);
 $current = time();
@@ -43,7 +47,7 @@ if(!$daily['webhookSent']) {
 	$sent = $db->prepare('UPDATE '.$dailyTable.' SET webhookSent = 1 WHERE feaID = :feaID');
 	$sent->execute([':feaID' => $daily['feaID']]);
 	
-	if($automaticCron) Cron::updateCreatorPoints($accountID, false);
+	if($automaticCron) Cron::updateCreatorPoints($person, false);
 }
 
 if($isEvent) {

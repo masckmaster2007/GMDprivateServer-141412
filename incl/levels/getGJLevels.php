@@ -6,23 +6,25 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person["accountID"];
 
 $time = time();
-$str = $echoString = $userString = $songsString = $queryJoin = '';
+$echoString = $userString = $songsString = $queryJoin = '';
 $levelsStatsArray = $epicParams = [];
 $order = "uploadDate";
 $orderSorting = "DESC";
 $orderEnabled = $isIDSearch = false;
 $filters = ["(unlisted = 0 AND unlisted2 = 0)"];
 
+$str = Escape::text($_POST["str"]) ?: '';
 $gameVersion = Escape::number($_POST["gameVersion"]) ?: 0;
 $binaryVersion = Escape::number($_POST["binaryVersion"]) ?: 0;
 $type = Escape::number($_POST["type"]) ?: 0;
 $diff = Escape::multiple_ids($_POST["diff"]) ?: '-';
+
+$pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"]) * 10 : 0;
 
 // Additional search parameters
 
@@ -103,9 +105,6 @@ switch($diff) {
 }
 
 // Type detection
-$str = Escape::text($_POST["str"]) ?: '';
-$pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"])."0" : 0;
-
 switch($type) {
 	case 0: // Search
 	case 15: // Most liked, changed to 15 in GDW for whatever reason
@@ -116,7 +115,7 @@ switch($type) {
 				$friendsArray[] = $accountID;
 				$friendsString = implode(",", $friendsArray);
 				$filters = ["levelID = ".$str." AND (
-					unlisted <> 1 OR
+					unlisted != 1 OR
 					(unlisted = 1 AND (extID IN (".$friendsString.")))
 				)"];
 				$isIDSearch = true;
@@ -186,7 +185,10 @@ switch($type) {
 		$friendsArray[] = $accountID;
 		$friendsString = implode(",", $friendsArray);
 		
-		$filters[] = "levelID IN (".$str.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")))";
+		$filters[] = "levelID IN (".$str.") AND (
+				unlisted != 1 OR
+				(unlisted = 1 AND (extID IN (".$friendsString.")))
+			)";
 		break;
 	case 11: // Awarded
 		$filters[] = "NOT starStars = 0";
@@ -222,7 +224,10 @@ switch($type) {
 		$friendsArray[] = $accountID;
 		$friendsString = implode(",", $friendsArray);
 		
-		$filters = ["levelID IN (".$listLevels.") AND (unlisted = 0 OR (unlisted = 1 AND extID IN (".$friendsString.")))"];
+		$filters = ["levelID IN (".$listLevels.") AND (
+				unlisted != 1 OR
+				(unlisted = 1 AND (extID IN (".$friendsString.")))
+			)"];
 		break;
 	case 27: // Sent levels
 		$queryJoin = "JOIN (SELECT suggestLevelId AS levelID, MAX(suggest.timestamp) AS timestamp FROM suggest GROUP BY levelID) suggest ON levels.levelID = suggest.levelID";
@@ -236,7 +241,7 @@ $levels = Library::getLevels($filters, $order, $orderSorting, $queryJoin, $pageO
 
 foreach($levels['levels'] as &$level) {
 	if(empty($level["levelID"])) continue;
-	if($isIDSearch && !Library::canAccountPlayLevel($accountID, $level)) break;
+	if($isIDSearch && !Library::canAccountPlayLevel($person, $level)) break;
 	
 	if($gameVersion < 20) $level['levelDesc'] = Escape::gd(Escape::url_base64_decode($level['levelDesc']));
 	$levelsStatsArray[] = ["levelID" => $level["levelID"], "stars" => $level["starStars"], 'coins' => $level["starCoins"]];

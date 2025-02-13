@@ -7,13 +7,13 @@ require_once __DIR__."/../lib/XOR.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person["accountID"];
+$userID = $person["userID"];
+
 $time = time();
 $smallChestStuff = $bigChestStuff = '0,0,0,0';
-
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
 
 $rewardType = Escape::number($_POST["rewardType"]);
 $chk = XORCipher::cipher(Escape::url_base64_decode(substr(Escape::latin($_POST["chk"]), 5)), 59182);

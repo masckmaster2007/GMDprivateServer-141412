@@ -4,19 +4,16 @@ require_once __DIR__."/../lib/mainLib.php";
 require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
-require_once __DIR__."/../lib/ip.php";
 $sec = new Security();
 
 if(!isset($_POST["stars"]) || !isset($_POST["demons"]) || !isset($_POST["icon"]) || !isset($_POST["color1"]) || !isset($_POST["color2"])) {
 	exit(CommonError::InvalidRequest);
 }
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$IP = IP::getIP();
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person["accountID"];
+$userID = $person["userID"];
 
 $stars = Escape::number($_POST["stars"]);
 $demons = Escape::number($_POST["demons"]);
@@ -77,7 +74,7 @@ if(!empty($dinfo)) {
 		JOIN (SELECT count(*) AS insanePlatformer FROM levels WHERE starDemonDiff = 5 AND levelLength = 5 AND levelID IN (".$dinfo.") AND starDemon != 0) insanePlatformer
 		JOIN (SELECT count(*) AS extremePlatformer FROM levels WHERE starDemonDiff = 6 AND levelLength = 5 AND levelID IN (".$dinfo.") AND starDemon != 0) extremePlatformer
 	)");
-	$demonsCount->execute(); // Doesn't work with [':levels' => $dinfo] way
+	$demonsCount->execute();
 	$demonsCount = $demonsCount->fetch();
 	
 	$allDemons = $demonsCount["easyNormal"] + $demonsCount["mediumNormal"] + $demonsCount["hardNormal"] + $demonsCount["insaneNormal"] + $demonsCount["extremeNormal"] + $demonsCount["easyPlatformer"] + $demonsCount["mediumPlatformer"] + $demonsCount["hardPlatformer"] + $demonsCount["insanePlatformer"] + $demonsCount["extremePlatformer"] + $dinfow + $dinfog;
@@ -102,7 +99,7 @@ $userCoinsDifference = $userCoins - $user["userCoins"];
 $diamondsDifference = $diamonds - $user["diamonds"];
 $moonsDifference = $moons - $user["moons"];
 
-Library::logAction($accountID, $IP, 9, $starsDifference, $coinsDifference, $demonsDifference, $userCoinsDifference, $diamondsDifference, $moonsDifference);
+Library::logAction($person, 9, $starsDifference, $coinsDifference, $demonsDifference, $userCoinsDifference, $diamondsDifference, $moonsDifference);
 
 if($gameVersion < 20 && !is_numeric($accountID) && $starsDifference + $coinsDifference + $demonsDifference + $userCoinsDifference + $diamondsDifference + $moonsDifference != 0) exit(CommonError::SubmitRestoreInfo);
 

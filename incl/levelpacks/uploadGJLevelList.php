@@ -5,11 +5,8 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $listID = Escape::number($_POST["listID"]);
 $listName = !empty(Escape::text($_POST["listName"])) ? Escape::text($_POST["listName"]) : "Unnamed list";
@@ -30,7 +27,7 @@ $listDetails = [
 	'unlisted' => $unlisted
 ];
 
-$listID = Library::uploadList($accountID, $listID, $listDetails);
+$listID = Library::uploadList($person, $listID, $listDetails);
 if(!$listID) exit(CommonError::InvalidRequest);
 
 exit((string)$listID);

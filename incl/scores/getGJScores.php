@@ -6,17 +6,15 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $stars = $demons = $coins = $userCoins = $moons = $diamonds = $creatorPoints = 0;
 $leaderboardsString = "";
 $type = Escape::latin($_POST["type"]);
 $count = $_POST["count"] ? Escape::number($_POST["count"]) : 50;
 
-$leaderboard = Library::getLeaderboard($accountID, $userID, $type, $count);
+$leaderboard = Library::getLeaderboard($person, $type, $count);
 $rank = $leaderboard['rank'];
 
 foreach($leaderboard['leaderboard'] AS &$user) {

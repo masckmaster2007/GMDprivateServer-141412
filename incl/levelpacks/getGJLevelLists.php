@@ -6,10 +6,8 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
-$userID = $player["userID"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $time = time();
 $str = $echoString = $userString = '';
@@ -23,7 +21,6 @@ $type = Escape::number($_POST["type"]) ?: 0;
 $diff = Escape::multiple_ids($_POST["diff"]) ?: '-';
 
 // Additional search parameters
-
 
 if(isset($_POST["star"]) && $_POST["star"] == 1) $filters[] = "NOT starStars = 0";
 
@@ -117,7 +114,7 @@ switch($type) {
 		break;
 }
 
-$lists = Library::getLists($accountID, $filters, $order, $pageOffset);
+$lists = Library::getLists($person, $filters, $order, $pageOffset);
 
 foreach($lists['lists'] as &$list) {
 	$list['listName'] = Escape::translit($list['listName']);

@@ -446,6 +446,9 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'toAccountID'");
 		$exist = $check->fetchAll();
 		if(!empty($exist)) $db->query("ALTER TABLE `messages` CHANGE `toAccountID` `toAccountID` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'userName'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `levels` DROP `userName`");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

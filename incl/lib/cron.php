@@ -1,11 +1,8 @@
 <?php
 class Cron {
-	public static function autoban($accountID, $checkForTime) {
+	public static function autoban($person, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 39 AND timestamp >= :timestamp");
@@ -66,16 +63,14 @@ class Cron {
 			Library::banPerson(0, $ban['userID'], $maxText, 0, 1, 2147483647);
 		}
 		
-		Library::logAction($accountID, $IP, 39, $stars, $coins, $demons, $moons, count($getCheaters));
+		Library::logAction($person, 39, $stars, $coins, $demons, $moons, count($getCheaters));
 		return true;
 	}
 	
-	public static function updateCreatorPoints($accountID, $checkForTime) {
+	public static function updateCreatorPoints($person, $checkForTime) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 40 AND timestamp >= :timestamp");
@@ -85,6 +80,8 @@ class Cron {
 		}
 		
 		$people = [];
+		
+		$unlistedQuery = !$unlistedCreatorPoints ? 'AND unlisted = 0 AND unlisted2 = 0' : '';
 		
 		/*
 			Creator Points for rated levels
@@ -98,15 +95,15 @@ class Cron {
 				) AS usersTable
 				LEFT JOIN
 				(
-					SELECT count(*) as starred, userID FROM levels WHERE starStars != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
+					SELECT count(*) as starred, userID FROM levels WHERE starStars != 0 AND isCPShared = 0 AND isDeleted = 0 ".$unlistedQuery." GROUP BY(userID) 
 				) AS starredTable ON usersTable.userID = starredTable.userID
 				LEFT JOIN
 				(
-					SELECT count(*) as featured, userID FROM levels WHERE starFeatured != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
+					SELECT count(*) as featured, userID FROM levels WHERE starFeatured != 0 AND isCPShared = 0 AND isDeleted = 0 ".$unlistedQuery." GROUP BY(userID) 
 				) AS featuredTable ON usersTable.userID = featuredTable.userID
 				LEFT JOIN
 				(
-					SELECT starEpic as epic, userID FROM levels WHERE starEpic != 0 AND isCPShared = 0 AND isDeleted = 0 GROUP BY(userID) 
+					SELECT starEpic as epic, userID FROM levels WHERE starEpic != 0 AND isCPShared = 0 AND isDeleted = 0 ".$unlistedQuery." GROUP BY(userID) 
 				) AS epicTable ON usersTable.userID = epicTable.userID
 			) calculated
 			ON users.userID = calculated.userID
@@ -117,7 +114,7 @@ class Cron {
 			Creator Points sharing
 		*/
 		
-		$shareCreatorPoints = $db->prepare("SELECT levelID, userID, starStars, starFeatured, starEpic FROM levels WHERE isCPShared != 0 AND isDeleted = 0");
+		$shareCreatorPoints = $db->prepare("SELECT levelID, userID, starStars, starFeatured, starEpic FROM levels WHERE isCPShared != 0 AND isDeleted = 0 ".$unlistedQuery);
 		$shareCreatorPoints->execute();
 		$shareCreatorPoints = $shareCreatorPoints->fetchAll();
 		
@@ -148,7 +145,7 @@ class Cron {
 		$mapPacksCreatorPoints = $mapPacksCreatorPoints->fetchAll();
 		
 		foreach($mapPacksCreatorPoints AS &$pack) {
-			$levels = $db->prepare("SELECT userID FROM levels WHERE levelID IN (".$pack['levels'].") AND isDeleted = 0");
+			$levels = $db->prepare("SELECT userID FROM levels WHERE levelID IN (".$pack['levels'].") AND isDeleted = 0 ".$unlistedQuery);
 			$levels->execute();
 			$levels = $levels->fetch();
 			
@@ -165,7 +162,7 @@ class Cron {
 		
 		foreach($gauntletsCreatorPoints AS &$gauntlet) {
 			for($x = 1; $x < 6; $x++) {
-				$gauntletCreatorPoints = $db->prepare("SELECT userID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
+				$gauntletCreatorPoints = $db->prepare("SELECT userID FROM levels WHERE levelID = :levelID AND isDeleted = 0 ".$unlistedQuery);
 				$gauntletCreatorPoints->execute([':levelID' => $gauntlet["level".$x]]);
 				$gauntletCreatorPoints = $gauntletCreatorPoints->fetch();
 				
@@ -182,7 +179,7 @@ class Cron {
 		$dailyCreatorPoints = $dailyCreatorPoints->fetchAll();
 		
 		foreach($dailyCreatorPoints AS &$daily) {
-			$dailyCreatorPoint = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
+			$dailyCreatorPoint = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0 ".$unlistedQuery);
 			$dailyCreatorPoint->execute([':levelID' => $daily["levelID"]]);
 			$dailyCreatorPoint = $dailyCreatorPoint->fetch();
 			
@@ -198,7 +195,7 @@ class Cron {
 		$eventsCreatorPoints = $eventsCreatorPoints->fetchAll();
 		
 		foreach($eventsCreatorPoints AS &$event) {
-			$eventCreatorPoints = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0");
+			$eventCreatorPoints = $db->prepare("SELECT userID, levelID FROM levels WHERE levelID = :levelID AND isDeleted = 0 ".$unlistedQuery);
 			$eventCreatorPoints->execute([':levelID' => $event["levelID"]]);
 			$eventCreatorPoints = $eventCreatorPoints->fetch();
 			
@@ -210,20 +207,17 @@ class Cron {
 		*/
 		
 		foreach($people AS $user => $cp) {
-			$updateCreatorPoints = $db->prepare("UPDATE users SET creatorPoints = (creatorpoints + :creatorpoints) WHERE userID = :userID");
-			$updateCreatorPoints->execute([':userID' => $user, ':creatorpoints' => $cp]);
+			$updateCreatorPoints = $db->prepare("UPDATE users SET creatorPoints = creatorPoints + :creatorPoints WHERE userID = :userID");
+			$updateCreatorPoints->execute([':userID' => $user, ':creatorPoints' => $cp]);
 		}
 		
-		Library::logAction($accountID, $IP, 40);
+		Library::logAction($person, 40);
 		return true;
 	}
 	
-	public static function fixUsernames($accountID, $checkForTime) {
+	public static function fixUsernames($person, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 41 AND timestamp >= :timestamp");
@@ -239,16 +233,13 @@ class Cron {
 			AND LENGTH(accounts.userName) <= 69");
 		$fixUsernames->execute();
 		
-		Library::logAction($accountID, $IP, 41);
+		Library::logAction($person, 41);
 		return true;
 	}
 	
-	public static function updateFriendsCount($accountID, $checkForTime) {
+	public static function updateFriendsCount($person, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 42 AND timestamp >= :timestamp");
@@ -272,16 +263,13 @@ class Cron {
 			SET accounts.friendsCount = IFNULL(calculated.friends, 0)");
 		$updateFriendsCount->execute();
 		
-		Library::logAction($accountID, $IP, 42);
+		Library::logAction($person, 42);
 		return true;
 	}
 	
-	public static function miscFixes($accountID, $checkForTime) {
+	public static function miscFixes($person, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 43 AND timestamp >= :timestamp");
@@ -312,16 +300,13 @@ class Cron {
 		$unbanIPs = $db->prepare('DELETE FROM bannedips WHERE IP REGEXP "'.$bannedIPsString.'"');
 		$unbanIPs->execute();
 		
-		Library::logAction($accountID, $IP, 43);
+		Library::logAction($person, 43);
 		return true;
 	}
 	
-	public static function updateSongsUsage($accountID, $checkForTime) {
+	public static function updateSongsUsage($person, $checkForTime) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/mainLib.php";
-		require_once __DIR__."/ip.php";
-		
-		$IP = IP::getIP();
 		
 		if($checkForTime) {
 			$check = $db->prepare("SELECT count(*) FROM actions WHERE type = 44 AND timestamp >= :timestamp");
@@ -405,18 +390,18 @@ class Cron {
 		$updatedAudio->execute();
 		$updatedAudio = $updatedAudio->fetch();
 		
-		Library::logAction($accountID, $IP, 44, $updatedAudio['songsCount'], $updatedAudio['sfxsCount']);
+		Library::logAction($person, 44, $updatedAudio['songsCount'], $updatedAudio['sfxsCount']);
 		return true;
 	}
 	
-	public static function doEverything($accountID, $checkForTime) {
+	public static function doEverything($person, $checkForTime) {
 		if(
-			!self::autoban($accountID, $checkForTime) ||
-			!self::updateCreatorPoints($accountID, $checkForTime) ||
-			!self::fixUsernames($accountID, $checkForTime) ||
-			!self::updateFriendsCount($accountID, $checkForTime) ||
-			!self::miscFixes($accountID, $checkForTime) ||
-			!self::updateSongsUsage($accountID, $checkForTime)
+			!self::autoban($person, $checkForTime) ||
+			!self::updateCreatorPoints($person, $checkForTime) ||
+			!self::fixUsernames($person, $checkForTime) ||
+			!self::updateFriendsCount($person, $checkForTime) ||
+			!self::miscFixes($person, $checkForTime) ||
+			!self::updateSongsUsage($person, $checkForTime)
 		) return false;
 		return true;
 	}

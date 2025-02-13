@@ -3,13 +3,11 @@ require_once __DIR__."/../incl/lib/mainLib.php";
 require_once __DIR__."/../incl/lib/security.php";
 require_once __DIR__."/../incl/lib/exploitPatch.php";
 require_once __DIR__."/../incl/lib/enums.php";
-require_once __DIR__."/../incl/lib/ip.php";
 $sec = new Security();
 
-$IP = IP::getIP();
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest);
-$accountID = $player["accountID"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person["accountID"];
 
 $account = Library::getAccountByID($accountID);
 

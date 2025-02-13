@@ -3,16 +3,11 @@ require_once __DIR__."/../lib/mainLib.php";
 require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
-require_once __DIR__."/../lib/ip.php";
 $lib = new Library();
 $sec = new Security();
 
-$player = $sec->loginPlayer();
-if(!$player["success"]) exit(CommonError::InvalidRequest.' '.$player['error']);
-$IP = IP::getIP();
-$accountID = $player["accountID"];
-$userID = $player["userID"];
-$userName = $player["userName"];
+$person = $sec->loginPlayer();
+if(!$person["success"]) exit(CommonError::InvalidRequest);
 
 $gameVersion = Escape::number($_POST["gameVersion"]);
 $levelID = Escape::number($_POST["levelID"]);
@@ -53,11 +48,10 @@ $sfxIDs = !empty($_POST["sfxIDs"]) ? Escape::multiple_ids($_POST["sfxIDs"]) : ''
 $ts = !empty($_POST["ts"]) ? Escape::number($_POST["ts"]) : 0;
 $password = !empty($_POST["password"]) ? Escape::number($_POST["password"]) : ($gameVersion > 21 ? 1 : 0);
 
-$isAbleToUploadLevel = Library::isAbleToUploadLevel($accountID, $userID, $IP);
+$isAbleToUploadLevel = Library::isAbleToUploadLevel($person);
 if(!$isAbleToUploadLevel['success']) exit(CommonError::InvalidRequest);
 
 $levelDetails = [
-	'userName' => $userName,
 	'gameVersion' => $gameVersion,
 	'binaryVersion' => $binaryVersion,
 	'levelDesc' => $levelDesc,
@@ -82,7 +76,9 @@ $levelDetails = [
 	'ts' => $ts,
 	'password' => $password
 ];
-$uploadLevel = $lib->uploadLevel($accountID, $userID, $levelID, $levelName, $levelString, $levelDetails);
+
+$uploadLevel = $lib->uploadLevel($person, $levelID, $levelName, $levelString, $levelDetails);
 if(!$uploadLevel['success']) exit(CommonError::InvalidRequest);
+
 exit($uploadLevel['levelID']);
 ?>
