@@ -14,6 +14,7 @@ $person = $sec->loginPlayer();
 if(!$person["success"]) exit(CommonError::InvalidRequest);
 $accountID = $person["accountID"];
 $userID = $person["userID"];
+$userName = $person["userName"];
 
 $stars = Escape::number($_POST["stars"]);
 $demons = Escape::number($_POST["demons"]);

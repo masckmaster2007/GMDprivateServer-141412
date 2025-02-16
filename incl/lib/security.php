@@ -120,11 +120,11 @@ class Security {
 		require_once __DIR__."/enums.php";
 		
 		switch(true) {
-			case isset($_POST['userName']):
+			case !empty($_POST['userName']):
 				$userName = Escape::latin($_POST['userName']);
 				$accountID = Library::getAccountIDWithUserName($userName);
 				break;
-			case isset($_POST['uuid']):
+			case !empty($_POST['uuid']):
 				$userID = Escape::number($_POST['uuid']);
 				$accountID = Library::getAccountID($userID);
 				break;

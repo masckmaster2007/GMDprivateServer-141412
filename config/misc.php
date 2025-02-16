@@ -201,7 +201,7 @@ $mentionLevelsInComments = true;
 	$normalLevelsVotes — should players be able to vote for difficulties on unrated levels
 		True — difficulty face votings are enabled
 		False — difficulty face votings are disabled
-	$demonDifficultiesVotes — should players be able to vote for demon difficulty faces
+	$demonDifficultiesVotes — should players be able to vote for demon difficulty faces on rated levels
 		True — voting for demon faces is enabled
 		False — voting for demon faces is disabled
 */

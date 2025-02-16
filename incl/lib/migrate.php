@@ -449,6 +449,12 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'userName'");
 		$exist = $check->fetchAll();
 		if(!empty($exist)) $db->query("ALTER TABLE `levels` DROP `userName`");
+	$check = $db->query("SHOW COLUMNS FROM `reports` LIKE 'hostname'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `reports` CHANGE `hostname` `IP` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'hostname'");
+		$exist = $check->fetchAll();
+		if(!empty($exist)) $db->query("ALTER TABLE `levels` CHANGE `hostname` `IP` VARCHAR(255) NOT NULL DEFAULT ''");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

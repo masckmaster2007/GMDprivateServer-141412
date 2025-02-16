@@ -280,7 +280,7 @@ class Commands {
 				if(!Library::checkPermission($person, 'commandDescription')) return "You don't have permissions to use command ".$command."!";
 			
 				unset($commentSplit[0]);
-				$newLevelDesc = trim(Escape::text(implode(' ', $commentSplit)));
+				$newLevelDesc = Library::escapeDescriptionCrash(trim(Escape::text(implode(' ', $commentSplit))));
 				if(!$newLevelDesc) {
 					return "Incorrect usage!".PHP_EOL
 						."!description *level description*".PHP_EOL
