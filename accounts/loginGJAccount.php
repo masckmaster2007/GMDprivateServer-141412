@@ -8,10 +8,11 @@ $accountID = $person['accountID'];
 $userID = $person['userID'];
 
 if(!$person['success']) {
-	Library::logAction($person, 6);
+	Library::logAction($person, Action::FailedLogin);
 	exit($person['error']);
 }
 
-Library::logAction($person, 2);
+Library::logAction($person, Action::SuccessfulLogin);
+
 exit($accountID.','.$userID);
 ?>

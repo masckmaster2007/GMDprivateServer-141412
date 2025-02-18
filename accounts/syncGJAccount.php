@@ -6,7 +6,13 @@ require_once __DIR__."/../incl/lib/enums.php";
 $sec = new Security();
 
 $person = $sec->loginPlayer();
-if(!$person["success"]) exit(CommonError::InvalidRequest);
+$userName = $person['userName'];
+
+if(!$person["success"]) {
+	Library::logAction($person, Action::FailedAccountSync, $userName, 1);
+	exit(CommonError::InvalidRequest);
+}
+
 $accountID = $person["accountID"];
 
 $account = Library::getAccountByID($accountID);
@@ -19,5 +25,13 @@ if(!empty($account['salt'])) {
 } else {
 	$saveData = file_get_contents(__DIR__."/../data/accounts/".$accountID);
 }
+
+if(empty($saveData)) {
+	Library::logAction($person, Action::FailedAccountSync, $userName, 2);
+	exit(BackupError::GenericError);
+}
+
+Library::logAction($person, Action::SuccessfulAccountSync, $userName, strlen($saveData));
+
 exit($saveData.";21;30;a;a");
 ?>

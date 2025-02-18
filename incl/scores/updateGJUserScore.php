@@ -6,15 +6,14 @@ require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 
-if(!isset($_POST["stars"]) || !isset($_POST["demons"]) || !isset($_POST["icon"]) || !isset($_POST["color1"]) || !isset($_POST["color2"])) {
-	exit(CommonError::InvalidRequest);
-}
+if(!isset($_POST["stars"]) || !isset($_POST["demons"]) || !isset($_POST["icon"]) || !isset($_POST["color1"]) || !isset($_POST["color2"])) exit(CommonError::InvalidRequest);
 
 $person = $sec->loginPlayer();
 if(!$person["success"]) exit(CommonError::InvalidRequest);
 $accountID = $person["accountID"];
 $userID = $person["userID"];
 $userName = $person["userName"];
+$IP = $person["IP"];
 
 $stars = Escape::number($_POST["stars"]);
 $demons = Escape::number($_POST["demons"]);
@@ -100,7 +99,7 @@ $userCoinsDifference = $userCoins - $user["userCoins"];
 $diamondsDifference = $diamonds - $user["diamonds"];
 $moonsDifference = $moons - $user["moons"];
 
-Library::logAction($person, 9, $starsDifference, $coinsDifference, $demonsDifference, $userCoinsDifference, $diamondsDifference, $moonsDifference);
+Library::logAction($person, Action::ProfileStatsChange, $starsDifference, $coinsDifference, $demonsDifference, $userCoinsDifference, $diamondsDifference, $moonsDifference);
 
 if($gameVersion < 20 && !is_numeric($accountID) && $starsDifference + $coinsDifference + $demonsDifference + $userCoinsDifference + $diamondsDifference + $moonsDifference != 0) exit(CommonError::SubmitRestoreInfo);
 

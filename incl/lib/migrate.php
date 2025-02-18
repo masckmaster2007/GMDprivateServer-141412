@@ -455,6 +455,15 @@ if(!$installed) {
 	$check = $db->query("SHOW COLUMNS FROM `levels` LIKE 'hostname'");
 		$exist = $check->fetchAll();
 		if(!empty($exist)) $db->query("ALTER TABLE `levels` CHANGE `hostname` `IP` VARCHAR(255) NOT NULL DEFAULT ''");
+	$check = $db->query("SHOW COLUMNS FROM `platscores` LIKE 'attempts'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) {
+			$db->query("ALTER TABLE `platscores` ADD `attempts` INT NOT NULL DEFAULT '0' AFTER `points`");
+			$db->query("ALTER TABLE `platscores` ADD `clicks` INT NOT NULL DEFAULT '0' AFTER `attempts`");
+			$db->query("ALTER TABLE `platscores` ADD `progresses` VARCHAR(255) NOT NULL DEFAULT '' AFTER `clicks`");
+			$db->query("ALTER TABLE `platscores` ADD `coins` INT NOT NULL DEFAULT '0' AFTER `progresses`");
+			$db->query("ALTER TABLE `platscores` ADD `dailyID` INT NOT NULL DEFAULT '0' AFTER `coins`");
+		}
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

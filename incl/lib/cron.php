@@ -63,7 +63,7 @@ class Cron {
 			Library::banPerson(0, $ban['userID'], $maxText, 0, 1, 2147483647);
 		}
 		
-		Library::logAction($person, 39, $stars, $coins, $demons, $moons, count($getCheaters));
+		Library::logAction($person, Action::CronAutoban, $stars, $coins, $demons, $moons, count($getCheaters));
 		return true;
 	}
 	
@@ -211,7 +211,7 @@ class Cron {
 			$updateCreatorPoints->execute([':userID' => $user, ':creatorPoints' => $cp]);
 		}
 		
-		Library::logAction($person, 40);
+		Library::logAction($person, Action::CronCreatorPoints);
 		return true;
 	}
 	
@@ -233,7 +233,7 @@ class Cron {
 			AND LENGTH(accounts.userName) <= 69");
 		$fixUsernames->execute();
 		
-		Library::logAction($person, 41);
+		Library::logAction($person, Action::CronUsernames);
 		return true;
 	}
 	
@@ -263,7 +263,7 @@ class Cron {
 			SET accounts.friendsCount = IFNULL(calculated.friends, 0)");
 		$updateFriendsCount->execute();
 		
-		Library::logAction($person, 42);
+		Library::logAction($person, Action::CronFriendsCount);
 		return true;
 	}
 	
@@ -300,7 +300,7 @@ class Cron {
 		$unbanIPs = $db->prepare('DELETE FROM bannedips WHERE IP REGEXP "'.$bannedIPsString.'"');
 		$unbanIPs->execute();
 		
-		Library::logAction($person, 43);
+		Library::logAction($person, Action::CronMisc);
 		return true;
 	}
 	
@@ -390,7 +390,7 @@ class Cron {
 		$updatedAudio->execute();
 		$updatedAudio = $updatedAudio->fetch();
 		
-		Library::logAction($person, 44, $updatedAudio['songsCount'], $updatedAudio['sfxsCount']);
+		Library::logAction($person, Action::CronSongsUsage, $updatedAudio['songsCount'], $updatedAudio['sfxsCount']);
 		return true;
 	}
 	

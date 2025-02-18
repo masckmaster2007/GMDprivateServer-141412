@@ -10,7 +10,7 @@ if(empty($saveData)) exit(BackupError::SomethingWentWrong);
 
 $person = $sec->loginPlayer();
 if(!$person["success"]) {
-	Library::logAction($person, 7, strlen($saveData));
+	Library::logAction($person, Action::FailedAccountBackup, strlen($saveData));
 	exit(CommonError::InvalidRequest);
 }
 
@@ -26,7 +26,7 @@ if(!empty($account['salt'])) {
 	file_put_contents(__DIR__."/../data/accounts/".$accountID, $saveData);
 }
 
-Library::logAction($person, 5, $userName, filesize(__DIR__."/../data/accounts/".$accountID), 0, 0);
+Library::logAction($person, Action::SuccessfulAccountBackup, $userName, filesize(__DIR__."/../data/accounts/".$accountID), 0, 0);
 
-exit(BackupError::Success);
+exit(CommonError::Success);
 ?>

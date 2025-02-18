@@ -1,3 +1,3 @@
 <?php
-require "incl/mods/requestUserAccess.php";
+require "incl/misc/requestUserAccess.php";
 ?>

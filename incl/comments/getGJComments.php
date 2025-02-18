@@ -64,7 +64,7 @@ foreach($comments['comments'] AS &$comment) {
 	
 	if(!$comment['extID']) $comment['extID'] = Library::getAccountID($comment['userID']);
 	
-	if($comment['userID'] == $comment['levelUserID'] || $comment['extID'] == $comment['levelAccountID']) $extraTextArray[] = 'Creator';
+	if($comment['userID'] == $comment['creatorUserID'] || $comment['extID'] == $comment['creatorAccountID']) $extraTextArray[] = 'Creator';
 	
 	$comment['comment'] = Escape::translit(Escape::url_base64_decode($comment["comment"]));
 	$showLevelID = $displayLevelID ? $comment["levelID"] : Library::getFirstMentionedLevel($comment['comment']);

@@ -153,7 +153,7 @@ switch($type) {
 		$order = "likes";
 		break;
 	case 5: // Levels per user
-		if($accountID && Library::getUserID($accountID) == $str) $filters = [];
+		if(Library::getUserID($accountID) == $str) $filters = [];
 		$filters[] = "levels.userID = '".$str."'";
 		break;
 	case 6: // Featured

@@ -1,3 +1,3 @@
 <?php
-include "incl/rewards/getGJSecretReward.php";
+require "incl/rewards/getGJSecretReward.php";
 ?>

@@ -44,7 +44,7 @@ class Library {
 			'IP' => $IP
 		];
 		
-		self::logAction($person, 1, $userName, $email, $userID);
+		self::logAction($person, Action::AccountRegister, $userName, $email, $userID);
 
 		// TO-DO: Re-add email verification
 		
@@ -266,7 +266,7 @@ class Library {
 		$uploadAccountComment->execute([':userID' => $userID, ':comment' => $comment, ':timestamp' => time()]);
 		$commentID = $db->lastInsertId();
 
-		self::logAction($person, 14, $userName, $comment, $commentID);
+		self::logAction($person, Action::AccountCommentUpload, $userName, $comment, $commentID);
 		
 		return $commentID;
 	}
@@ -279,7 +279,7 @@ class Library {
 		$updateAccountSettings = $db->prepare("UPDATE accounts SET mS = :messagesState, frS = :friendRequestsState, cS = :commentsState, youtubeurl = :socialsYouTube, twitter = :socialsTwitter, twitch = :socialsTwitch WHERE accountID = :accountID");
 		$updateAccountSettings->execute([':accountID' => $accountID, ':messagesState' => $messagesState, ':friendRequestsState' => $friendRequestsState, ':commentsState' => $commentsState, ':socialsYouTube' => $socialsYouTube, ':socialsTwitter' => $socialsTwitter, ':socialsTwitch' => $socialsTwitch]);
 		
-		self::logAction($person, 27, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch);
+		self::logAction($person, Action::ProfileSettingsChange, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch);
 	}
 	
 	public static function getFriends($accountID) {
@@ -315,7 +315,7 @@ class Library {
 	public static function getCommentsOfUser($userID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT * FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT *, levels.userID AS creatorUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE comments.userID = :userID AND levels.unlisted = 0 AND levels.unlisted2 = 0 AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':userID' => $userID]);
 		$comments = $comments->fetchAll();
 		
@@ -329,15 +329,19 @@ class Library {
 	public static function deleteAccountComment($person, $commentID) {
 		require __DIR__."/connection.php";
 		
+		$accountID = $person['accountID'];
+		$userName = $person['userName'];
 		$userID = $person['userID'];
 		
-		$getComment = $db->prepare("SELECT count(*) FROM acccomments WHERE userID = :userID AND commentID = :commentID");
+		$getComment = $db->prepare("SELECT * FROM acccomments WHERE userID = :userID AND commentID = :commentID");
 		$getComment->execute([':userID' => $userID, ':commentID' => $commentID]);
-		$getComment = $getComment->fetchColumn();
+		$getComment = $getComment->fetch();
 		if(!$getComment) return false;
 		
 		$deleteComment = $db->prepare("DELETE FROM acccomments WHERE commentID = :commentID");
 		$deleteComment->execute([':commentID' => $commentID]);
+		
+		self::logAction($person, Action::AccountCommentDeletion, $userName, $getComment['comment'], $accountID, $getComment['commentID'], $getComment['likes'], $getComment['dislikes']);
 		
 		return true;
 	}
@@ -948,7 +952,7 @@ class Library {
 		return $blocks;
 	}
 	
-	public static function removeFriend($person, $targetAccountID) {
+	public static function removeFriend($person, $targetAccountID, $logAction = true) {
 		require __DIR__."/connection.php";
 		
 		$accountID = $person['accountID'];
@@ -958,6 +962,8 @@ class Library {
 		
 		$removeFriend = $db->prepare("DELETE FROM friendships WHERE (person1 = :accountID AND person2 = :targetAccountID) OR (person1 = :targetAccountID AND person2 = :accountID)");
 		$removeFriend->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		if($logAction) self::logAction($person, Action::FriendRemove, $targetAccountID);
 		
 		return true;
 	}
@@ -972,6 +978,8 @@ class Library {
 		
 		$unblockUser = $db->prepare("DELETE FROM blocks WHERE person1 = :accountID AND person2 = :targetAccountID");
 		$unblockUser->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
+		
+		self::logAction($person, Action::UnblockAccount, $targetAccountID);
 		
 		return true;
 	}
@@ -1040,16 +1048,20 @@ class Library {
 			VALUES (:accountID, :toAccountID, :comment, :timestamp)");
 		$sendFriendRequest->execute([':accountID' => $accountID, ':toAccountID' => $toAccountID, ':comment' => $comment, ':timestamp' => time()]);
 		
+		self::logAction($person, Action::FriendRequestSend, $toAccountID);
+		
 		return true;
 	}
 	
-	public static function deleteFriendRequests($person, $accounts) {
+	public static function deleteFriendRequests($person, $accounts, $logAction = true) {
 		require __DIR__."/connection.php";
 		
 		$accountID = $person['accountID'];
 		
 		$deleteFriendRequests = $db->prepare("DELETE FROM friendreqs WHERE (accountID = :accountID AND toAccountID IN (".$accounts.")) OR (toAccountID = :accountID AND accountID IN (".$accounts."))");
 		$deleteFriendRequests->execute([':accountID' => $accountID]);
+		
+		if($logAction) self::logAction($person, Action::FriendRequestDeny, $accounts);
 		
 		return true;
 	}
@@ -1063,11 +1075,13 @@ class Library {
 		
 		if($accountID == $getFriendRequest['accountID']) return false;
 		
-		self::deleteFriendRequests($accountID, $getFriendRequest['accountID']);
+		self::deleteFriendRequests($accountID, $getFriendRequest['accountID'], false);
 		
 		$acceptFriendRequest = $db->prepare("INSERT INTO friendships (person1, person2, isNew1, isNew2)
 			VALUES (:accountID, :targetAccountID, 1, 1)");
 		$acceptFriendRequest->execute([':accountID' => $accountID, ':targetAccountID' => $getFriendRequest['accountID']]);
+		
+		self::logAction($person, Action::FriendRequestAccept, $getFriendRequest['accountID']);
 		
 		return true;
 	}
@@ -1094,7 +1108,9 @@ class Library {
 			VALUES (:accountID, :targetAccountID)");
 		$blockUser->execute([':accountID' => $accountID, ':targetAccountID' => $targetAccountID]);
 		
-		self::removeFriend($accountID, $targetAccountID);
+		self::removeFriend($accountID, $targetAccountID, false);
+		
+		self::logAction($person, Action::BlockAccount, $targetAccountID);
 		
 		return true;
 	}
@@ -1175,7 +1191,7 @@ class Library {
 		$reduceUses = $db->prepare('UPDATE vaultcodes SET uses = uses - 1 WHERE rewardID = :rewardID');
 		$reduceUses->execute([':rewardID' => $vaultCode['rewardID']]);
 		
-		Library::logAction($accountID, $IP, 38, $vaultCode['rewardID'], $vaultCode['rewards'], $code);
+		self::logAction($accountID, $IP, Action::VaultCodeUse, $vaultCode['rewardID'], $vaultCode['rewards'], $code);
 		
 		return true;
 	}
@@ -1240,7 +1256,7 @@ class Library {
 			$updateLevel = $db->prepare('UPDATE levels SET gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, IP = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID');
 			$updateLevel->execute([':levelID' => $levelID, ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
 			
-			self::logAction($person, 23, $levelName, $levelDetails['levelDesc'], $levelID);
+			self::logAction($person, Action::LevelChange, $levelName, $levelDetails['levelDesc'], $levelID);
 			return ["success" => true, "levelID" => (string)$levelID];
 		}
 		
@@ -1256,7 +1272,7 @@ class Library {
 			$updateLevel = $db->prepare('UPDATE levels SET gameVersion = :gameVersion, binaryVersion = :binaryVersion, levelDesc = :levelDesc, levelVersion = levelVersion + 1, levelLength = :levelLength, audioTrack = :audioTrack, auto = :auto, original = :original, twoPlayer = :twoPlayer, songID = :songID, objects = :objects, coins = :coins, requestedStars = :requestedStars, extraString = :extraString, levelString = "", levelInfo = :levelInfo, unlisted = :unlisted, IP = :IP, isLDM = :isLDM, wt = :wt, wt2 = :wt2, unlisted2 = :unlisted, settingsString = :settingsString, songIDs = :songIDs, sfxIDs = :sfxIDs, ts = :ts, password = :password, updateDate = :timestamp WHERE levelID = :levelID AND isDeleted = 0');
 			$updateLevel->execute([':levelID' => $checkLevelExistenceByName['levelID'], ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => time(), ':IP' => $IP]);
 			
-			self::logAction($person, 23, $levelName, $levelDetails['levelDesc'], $checkLevelExistenceByName['levelID']);
+			self::logAction($person, Action::LevelChange, $levelName, $levelDetails['levelDesc'], $checkLevelExistenceByName['levelID']);
 			return ["success" => true, "levelID" => (string)$checkLevelExistenceByName['levelID']];
 		}
 		
@@ -1267,10 +1283,11 @@ class Library {
 		$uploadLevel = $db->prepare("INSERT INTO levels (userID, extID, gameVersion, binaryVersion, levelName, levelDesc, levelVersion, levelLength, audioTrack, auto, original, twoPlayer, songID, objects, coins, requestedStars, extraString, levelString, levelInfo, unlisted, unlisted2, IP, isLDM, wt, wt2, settingsString, songIDs, sfxIDs, ts, password, uploadDate, updateDate)
 			VALUES (:userID, :accountID, :gameVersion, :binaryVersion, :levelName, :levelDesc, 1, :levelLength, :audioTrack, :auto, :original, :twoPlayer, :songID, :objects, :coins, :requestedStars, :extraString, '', :levelInfo, :unlisted, :unlisted, :IP, :isLDM, :wt, :wt2, :settingsString, :songIDs, :sfxIDs, :ts, :password, :timestamp, 0)");
 		$uploadLevel->execute([':userID' => $userID, ':accountID' => $accountID, ':gameVersion' => $levelDetails['gameVersion'], ':binaryVersion' => $levelDetails['binaryVersion'], ':levelName' => $levelName, ':levelDesc' => $levelDetails['levelDesc'], ':levelLength' => $levelDetails['levelLength'], ':audioTrack' => $levelDetails['audioTrack'], ':auto' => $levelDetails['auto'], ':original' => $levelDetails['original'], ':twoPlayer' => $levelDetails['twoPlayer'], ':songID' => $levelDetails['songID'], ':objects' => $levelDetails['objects'], ':coins' => $levelDetails['coins'], ':requestedStars' => $levelDetails['requestedStars'], ':extraString' => $levelDetails['extraString'], ':levelInfo' => $levelDetails['levelInfo'], ':unlisted' => $levelDetails['unlisted'], ':isLDM' => $levelDetails['isLDM'], ':wt' => $levelDetails['wt'], ':wt2' => $levelDetails['wt2'], ':settingsString' => $levelDetails['settingsString'], ':songIDs' => $levelDetails['songIDs'], ':sfxIDs' => $levelDetails['sfxIDs'], ':ts' => $levelDetails['ts'], ':password' => $levelDetails['password'], ':timestamp' => $timestamp, ':IP' => $IP]);
-		
 		$levelID = $db->lastInsertId();
+		
 		rename(__DIR__.'/../../data/levels/'.$userID.'_'.$timestamp, __DIR__.'/../../data/levels/'.$levelID);
-		self::logAction($person, 22, $levelName, $levelDetails['levelDesc'], $levelID);
+		self::logAction($person, Action::LevelUpload, $levelName, $levelDetails['levelDesc'], $levelID);
+		
 		return ["success" => true, "levelID" => (string)$levelID];
 	}
 	
@@ -1387,7 +1404,7 @@ class Library {
 	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT *, levels.userID AS levelUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT *, levels.userID AS creatorUserID FROM levels INNER JOIN comments ON comments.levelID = levels.levelID WHERE levels.levelID = :levelID AND levels.isDeleted = 0 ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':levelID' => $levelID]);
 		$comments = $comments->fetchAll();
 		
@@ -1412,7 +1429,7 @@ class Library {
 		$uploadAccountComment->execute([':userID' => $userID, ':levelID' => $levelID, ':percent' => $percent, ':comment' => $comment, ':timestamp' => time()]);
 		$commentID = $db->lastInsertId();
 
-		self::logAction($person, 15, $userName, $comment, $commentID, $levelID);
+		self::logAction($person, Action::CommentUpload, $userName, $comment, $commentID, $levelID);
 		
 		return $commentID;
 	}
@@ -1736,13 +1753,19 @@ class Library {
 	public static function deleteComment($person, $commentID) {
 		require __DIR__."/connection.php";
 		
-		$getComment = $db->prepare("SELECT count(*) FROM comments WHERE userID = :userID AND commentID = :commentID");
-		$getComment->execute([':userID' => $person['userID'], ':commentID' => $commentID]);
+		$userID = $person['userID'];
+		
+		$getComment = $db->prepare("SELECT * FROM comments WHERE userID = :userID AND commentID = :commentID");
+		$getComment->execute([':userID' => $userID, ':commentID' => $commentID]);
 		$getComment = $getComment->fetchColumn();
 		if(!$getComment && !self::checkPermission($person, 'actionDeleteComment')) return false;
 		
+		$user = self::getUserByID($getComment['userID']);
+		
 		$deleteComment = $db->prepare("DELETE FROM comments WHERE commentID = :commentID");
 		$deleteComment->execute([':commentID' => $commentID]);
+		
+		self::logAction($person, Action::CommentDeletion, $user['userName'], $getComment['comment'], $user['extID'], $getComment['commentID'], $getComment['likes'] - $getComment['dislikes'], $getComment['levelID']);
 		
 		return true;
 	}
@@ -1784,8 +1807,14 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
 		
+		$description = Escape::url_base64_encode($description);
+		
 		$changeLevelDescription = $db->prepare("UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID AND isDeleted = 0");
-		$changeLevelDescription->execute([':levelID' => $levelID, ':levelDesc' => Escape::url_base64_encode($description)]);
+		$changeLevelDescription->execute([':levelID' => $levelID, ':levelDesc' => $description]);
+		
+		$level = self::getLevelByID($levelID);
+		
+		self::logAction($person, Action::LevelChange, $level['levelName'], $description, $levelID);
 		
 		return true;
 	}
@@ -1853,6 +1882,8 @@ class Library {
 		$deleteLevel = $db->prepare("UPDATE levels SET isDeleted = 1 WHERE levelID = :levelID AND isDeleted = 0");
 		$deleteLevel->execute([':levelID' => $levelID]);
 		
+		self::logAction($person, Action::LevelDeletion, $levelID);
+		
 		if(file_exists(__DIR__."/../../data/levels/".$levelID)) rename(__DIR__."/../../data/levels/".$levelID, __DIR__."/../../data/levels/deleted/".$levelID);
 		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
@@ -1885,6 +1916,154 @@ class Library {
 		$reportLevel->execute([':levelID' => $levelID, ':IP' => $IP]);
 		
 		return true;
+	}
+	
+	public static function submitLevelScore($levelID, $person, $percent, $attempts, $clicks, $time, $progresses, $coins, $dailyID) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		$condition = $dailyID ? ">" : "=";
+		$level = self::getLevelByID($levelID);
+		
+		if($coins > $level['coins']) {
+			self::banPerson(0, $accountID, "Person tried to post level score with invalid coins value. (".$coins.")", 0, 0, 2147483647);
+			return false;
+		}
+		if($percent < 0 || $percent > 100) {
+			self::banPerson(0, $accountID, "Person tried to post level score with invalid percent value. (".$percent.")", 0, 0, 2147483647);
+			return false;
+		}
+		
+		$oldPercent = $db->prepare("SELECT percent FROM levelscores WHERE accountID = :accountID AND levelID = :levelID AND dailyID ".$condition." 0");
+		$oldPercent->execute([':accountID' => $accountID, ':levelID' => $levelID]);
+		$oldPercent = $oldPercent->fetchColumn();
+		if(!$oldPercent && $percent > 0) {
+			$submitLevelScore = $db->prepare("INSERT INTO levelscores (accountID, levelID, percent, uploadDate, coins, attempts, clicks, time, progresses, dailyID)
+				VALUES (:accountID, :levelID, :percent, :timestamp, :coins, :attempts, :clicks, :time, :progresses, :dailyID)");
+			$submitLevelScore->execute([':accountID' => $accountID, ':levelID' => $levelID, ':percent' => $percent, ':timestamp' => time(), ':coins' => $coins, ':attempts' => $attempts, ':clicks' => $clicks, ':time' => $time, ':progresses' => $progresses, ':dailyID' => $dailyID]);
+			
+			self::logAction($person, Action::LevelScoreSubmit, $levelID, $percent, $coins, $attempts, $clicks, $time);
+			
+			return true;
+		} elseif($oldPercent < $percent) {
+			$updateLevelScore = $db->prepare("UPDATE levelscores SET percent = :percent, uploadDate = :timestamp, coins = :coins, attempts = :attempts, clicks = :clicks, time = :time, progresses = :progresses, dailyID = :dailyID WHERE accountID = :accountID AND levelID = :levelID AND dailyID ".$condition." 0");
+			$updateLevelScore->execute([':accountID' => $accountID, ':levelID' => $levelID, ':percent' => $percent, ':timestamp' => time(), ':coins' => $coins, ':attempts' => $attempts, ':clicks' => $clicks, ':time' => $time, ':progresses' => $progresses, ':dailyID' => $dailyID]);
+			
+			self::logAction($person, Action::LevelScoreUpdate, $levelID, $percent, $coins, $attempts, $clicks, $time);
+			
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public static function getLevelScores($levelID, $person, $type, $dailyID) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		$condition = $dailyID ? ">" : "=";
+		
+		$queryText = self::getBannedPeopleQuery(0, true);
+		
+		switch($type) {
+			case 0:
+				$friendsArray = self::getFriends($accountID);
+				$friendsArray[] = $accountID;
+				$friendsString = implode(",", $friendsArray);
+				$getLevelScores = $db->prepare("SELECT *, levelscores.coins AS scoreCoins FROM levelscores INNER JOIN users ON users.extID = levelscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND accountID IN (".$friendsString.") ORDER BY percent DESC, uploadDate ASC");
+				$getLevelScores->execute([':levelID' => $levelID]);
+				break;
+			case 1:
+				$getLevelScores = $db->prepare("SELECT *, levelscores.coins AS scoreCoins FROM levelscores INNER JOIN users ON users.extID = levelscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID ORDER BY percent DESC, uploadDate ASC");
+				$getLevelScores->execute([':levelID' => $levelID]);
+				break;
+			case 2:
+				$getLevelScores = $db->prepare("SELECT *, levelscores.coins AS scoreCoins FROM levelscores INNER JOIN users ON users.extID = levelscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND uploadDate > :time ORDER BY percent DESC, uploadDate ASC");
+				$getLevelScores->execute([':levelID' => $levelID, ':time' => time() - 604800]);
+				break;
+			default:
+				return false;
+		}
+		
+		$getLevelScores = $getLevelScores->fetchAll();
+		
+		return $getLevelScores;
+	}
+	
+	public static function submitPlatformerLevelScore($levelID, $person, $scores, $attempts, $clicks, $progresses, $coins, $dailyID, $mode) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		$condition = $dailyID ? ">" : "=";
+		$level = self::getLevelByID($levelID);
+		
+		if($coins > $level['coins']) {
+			self::banPerson(0, $accountID, "Person tried to post level score with invalid coins value. (".$coins.")", 0, 0, 2147483647);
+			return false;
+		}
+		
+		if($scores['time'] < 0 || $scores['points'] < 0) {
+			self::banPerson(0, $accountID, "Person tried to post level score with invalid scores value. (time: ".$scores['time'].", points: ".$scores['points'].")", 0, 0, 2147483647);
+			return false;
+		}
+		
+		if($scores['time'] == 0) return false;
+		
+		$oldPercent = $db->prepare("SELECT time, points FROM platscores WHERE accountID = :accountID AND levelID = :levelID AND dailyID ".$condition." 0");
+		$oldPercent->execute([':accountID' => $accountID, ':levelID' => $levelID]);
+		$oldPercent = $oldPercent->fetch();
+		if(!$oldPercent['time']) {
+			$submitLevelScore = $db->prepare("INSERT INTO platscores (accountID, levelID, time, points, timestamp, coins, attempts, clicks, progresses, dailyID)
+				VALUES (:accountID, :levelID, :time, :points, :timestamp, :coins, :attempts, :clicks, :progresses, :dailyID)");
+			$submitLevelScore->execute([':accountID' => $accountID, ':levelID' => $levelID, ':time' => $scores['time'], ':points' => $scores['points'], ':timestamp' => time(), ':coins' => $coins, ':attempts' => $attempts, ':clicks' => $clicks, ':progresses' => $progresses, ':dailyID' => $dailyID]);
+			
+			self::logAction($person, Action::PlatformerLevelScoreSubmit, $levelID, $scores['time'], $scores['points'], $attempts, $clicks, $time);
+			
+			return true;
+		} elseif(($mode == "time" AND $oldPercent['time'] > $scores['time']) OR ($mode == "points" AND $oldPercent['points'] < $scores['points'])) {
+			$updateLevelScore = $db->prepare("UPDATE platscores SET time = :time, points = :points, timestamp = :timestamp, coins = :coins, attempts = :attempts, clicks = :clicks, progresses = :progresses, dailyID = :dailyID WHERE accountID = :accountID AND levelID = :levelID AND dailyID ".$condition." 0");
+			$updateLevelScore->execute([':accountID' => $accountID, ':levelID' => $levelID, ':time' => $scores['time'], ':points' => $scores['points'], ':timestamp' => time(), ':coins' => $coins, ':attempts' => $attempts, ':clicks' => $clicks, ':progresses' => $progresses, ':dailyID' => $dailyID]);
+			
+			self::logAction($person, Action::PlatformerLevelScoreUpdate, $levelID, $scores['time'], $scores['points'], $attempts, $clicks, $time);
+			
+			return true;
+		}
+		
+		return false;
+	}
+	
+	public static function getPlatformerLevelScores($levelID, $person, $type, $dailyID, $mode) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		$condition = $dailyID ? ">" : "=";
+		$order = $mode == 'time' ? 'ASC' : 'DESC';
+		
+		$queryText = self::getBannedPeopleQuery(0, true);
+		
+		switch($type) {
+			case 0:
+				$friendsArray = self::getFriends($accountID);
+				$friendsArray[] = $accountID;
+				$friendsString = implode(",", $friendsArray);
+				$getLevelScores = $db->prepare("SELECT *, platscores.coins AS scoreCoins FROM platscores INNER JOIN users ON users.extID = platscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND accountID IN (".$friendsString.") ORDER BY ".$mode." ".$order.", timestamp ASC");
+				$getLevelScores->execute([':levelID' => $levelID]);
+				break;
+			case 1:
+				$getLevelScores = $db->prepare("SELECT *, platscores.coins AS scoreCoins FROM platscores INNER JOIN users ON users.extID = platscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID ORDER BY ".$mode." ".$order.", timestamp ASC");
+				$getLevelScores->execute([':levelID' => $levelID]);
+				break;
+			case 2:
+				$getLevelScores = $db->prepare("SELECT *, platscores.coins AS scoreCoins FROM platscores INNER JOIN users ON users.extID = platscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND timestamp > :time ORDER BY ".$mode." ".$order.", timestamp ASC");
+				$getLevelScores->execute([':levelID' => $levelID, ':time' => time() - 604800]);
+				break;
+			default:
+				return false;
+		}
+		
+		$getLevelScores = $getLevelScores->fetchAll();
+		
+		return $getLevelScores;
 	}
 	
 	/*
@@ -1994,7 +2173,7 @@ class Library {
 	public static function getCommentsOfList($listID, $sortMode, $pageOffset) {
 		require __DIR__."/connection.php";
 		
-		$comments = $db->prepare("SELECT *, lists.accountID AS levelAccountID FROM lists INNER JOIN comments ON comments.levelID = (lists.listID * -1) WHERE lists.listID = :listID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
+		$comments = $db->prepare("SELECT *, lists.accountID AS creatorAccountID FROM lists INNER JOIN comments ON comments.levelID = (lists.listID * -1) WHERE lists.listID = :listID ORDER BY ".$sortMode." DESC LIMIT 10 OFFSET ".$pageOffset);
 		$comments->execute([':listID' => $listID]);
 		$comments = $comments->fetchAll();
 		
@@ -2017,7 +2196,7 @@ class Library {
 			$updateList = $db->prepare('UPDATE lists SET listDesc = :listDesc, listVersion = listVersion + 1, listlevels = :listlevels, starDifficulty = :difficulty, original = :original, unlisted = :unlisted, updateDate = :timestamp WHERE listID = :listID');
 			$updateList->execute([':listID' => $listID, ':listDesc' => $listDetails['listDesc'], ':listlevels' => $listDetails['listLevels'], ':difficulty' => $listDetails['difficulty'], ':original' => $listDetails['original'], ':unlisted' => $listDetails['unlisted'], ':timestamp' => time()]);
 			
-			self::logAction($person, 18, $listDetails['listName'], $listDetails['listLevels'], $listID, $listDetails['difficulty'], $listDetails['unlisted']);
+			self::logAction($person, Action::ListChange, $listDetails['listName'], $listDetails['listLevels'], $listID, $listDetails['difficulty'], $listDetails['unlisted']);
 			//$gs->sendLogsListChangeWebhook($listID, $accountID, $list);
 			return $listID;
 		}
@@ -2025,6 +2204,8 @@ class Library {
 		$list = $db->prepare('INSERT INTO lists (listName, listDesc, listVersion, accountID, listlevels, starDifficulty, original, unlisted, uploadDate) VALUES (:listName, :listDesc, 1, :accountID, :listlevels, :difficulty, :original, :unlisted, :timestamp)');
 		$list->execute([':listName' => $listDetails['listName'], ':listDesc' => $listDetails['listDesc'], ':accountID' => $accountID, ':listlevels' => $listDetails['listLevels'], ':difficulty' => $listDetails['difficulty'], ':original' => $listDetails['original'], ':unlisted' => $listDetails['unlisted'], ':timestamp' => time()]);
 		$listID = $db->lastInsertId();
+		
+		self::logAction($person, Action::ListUpload, $listDetails['listName'], $listDetails['listLevels'], $listID, $listDetails['difficulty'], $listDetails['unlisted']);
 		
 		return $listID;
 	}
@@ -2039,6 +2220,8 @@ class Library {
 		
 		$deleteList = $db->prepare("DELETE FROM lists WHERE listID = :listID");
 		$deleteList->execute([':listID' => $listID]);
+		
+		self::logAction($person, Action::ListDeletion, $list['listName'], $list['listLevels'], $listID, $list['difficulty'], $list['unlisted']);
 		
 		return true;
 	}
