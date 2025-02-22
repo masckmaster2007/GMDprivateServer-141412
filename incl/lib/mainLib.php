@@ -2991,6 +2991,20 @@ class Library {
 		
 		return ["ID" => $clanInfo["ID"], "clan" => $clanInfo["clan"], "tag" => $clanInfo["tag"], "desc" => $clanInfo["desc"], "clanOwner" => $clanInfo["clanOwner"], "color" => $clanInfo["color"], "isClosed" => $clanInfo["isClosed"], "creationDate" => $clanInfo["creationDate"]];
 	}
+
+	public static function getLatestSendsByLevelID($levelID) {
+		require_once __DIR__ . "/connection.php";
+
+		if(isset($GLOBALS['core_cache']['latestSends'][$levelID])) return $GLOBALS['core_cache']['latestSends'][$levelID];
+
+		$sendsInfo = $db->prepare("SELECT * FROM suggest WHERE suggestLevelId = :levelID ORDER BY timestamp DESC");
+		$sendsInfo->execute([":levelID" => $levelID]);
+		$sendsInfo = $query->fetchAll();
+
+		$GLOBALS['core_cache']['latestSends'][$levelID] = $sendsInfo;
+
+		return $sendsInfo;
+	}
 	
 	public static function makeClanUsername($accountID) {
 		require __DIR__."/../../config/dashboard.php";
@@ -3032,6 +3046,47 @@ class Library {
 		$user['userName'] = self::makeClanUsername($user['extID']);
 		
 		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":32:".$user["ID"].":35:".$user["comment"].":41:".$user["isNew"].":37:".$user['uploadTime'];
+	}
+	public static function getGMDFile($levelID) {
+		require_once __DIR__."/connection.php";
+
+		if(!is_numeric($levelID)) return false;
+
+		$level = self::getLevelByID($levelID);
+
+		if(!$level) return false;
+		
+		$levelString = file_get_contents(__DIR__.'/../../data/levels/'.$levelID) ?? $level['levelString'];
+		$gmdFile = '<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict>';
+		
+		$gmdFile .= '<k>k1</k><i>'.$levelID.'</i>';
+		$gmdFile .= '<k>k2</k><s>'.$level['levelName'].'</s>';
+		$gmdFile .= '<k>k3</k><s>'.$level['levelDesc'].'</s>';
+		$gmdFile .= '<k>k4</k><s>'.$levelString.'</s>';
+		$gmdFile .= '<k>k5</k><s>'.$level['userName'].'</s>';
+		$gmdFile .= '<k>k6</k><i>'.$level['userID'].'</i>';
+		$gmdFile .= '<k>k8</k><i>'.$level['audioTrack'].'</i>';
+		$gmdFile .= '<k>k11</k><i>'.$level['downloads'].'</i>';
+		$gmdFile .= '<k>k13</k><t />';
+		$gmdFile .= '<k>k16</k><i>'.$level['levelVersion'].'</i>';
+		$gmdFile .= '<k>k21</k><i>2</i>';
+		$gmdFile .= '<k>k23</k><i>'.$level['levelLength'].'</i>';
+		$gmdFile .= '<k>k42</k><i>'.$level['levelID'].'</i>';
+		$gmdFile .= '<k>k45</k><i>'.$level['songID'].'</i>';
+		$gmdFile .= '<k>k47</k><t />';
+		$gmdFile .= '<k>k48</k><i>'.$level['objects'].'</i>';
+		$gmdFile .= '<k>k50</k><i>'.$level['binaryVersion'].'</i>';
+		$gmdFile .= '<k>k87</k><i>556365614873111</i>';
+		$gmdFile .= '<k>k101</k><i>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</i>';
+		$gmdFile .= '<k>kl1</k><i>0</i>';
+		$gmdFile .= '<k>kl2</k><i>0</i>';
+		$gmdFile .= '<k>kl3</k><i>1</i>';
+		$gmdFile .= '<k>kl5</k><i>1</i>';
+		$gmdFile .= '<k>kl6</k><k>kI6</k><d><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s></d>';
+		
+		$gmdFile .= '</dict></plist>';
+
+		return $gmdFile;
 	}
 }
 ?>
