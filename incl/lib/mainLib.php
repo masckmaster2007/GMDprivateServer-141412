@@ -301,7 +301,7 @@ class Library {
 		return $user['userID'].':'.$user["userName"].':'.$user['extID'];
 	}
 	
-	public static function isAccountAdmininstrator($accountID) {
+	public static function isAccountAdministrator($accountID) {
 		if(isset($GLOBALS['core_cache']['isAdministrator'][$accountID])) return $GLOBALS['core_cache']['isAdministrator'][$accountID];
 		
 		$account = self::getAccountByID($accountID);
@@ -531,7 +531,7 @@ class Library {
 	public static function checkPermission($person, $permission) {
 		if(isset($GLOBALS['core_cache']['permissions'][$permission][$person['accountID']])) return $GLOBALS['core_cache']['permissions'][$permission][$person['accountID']];
 		
-		$isAdmin = self::isAccountAdmininstrator($person['accountID']);
+		$isAdmin = self::isAccountAdministrator($person['accountID']);
 		if($isAdmin) {
 			$GLOBALS['core_cache']['permissions'][$permission][$person['accountID']] = true;
 			return true;
@@ -1324,7 +1324,7 @@ class Library {
 		
 		$accountID = $person['accountID'];
 		
-		if($unlistedLevelsForAdmins && self::isAccountAdmininstrator($accountID)) return true;
+		if($unlistedLevelsForAdmins && self::isAccountAdministrator($accountID)) return true;
 		
 		return !($level['unlisted'] > 0 && ($level['unlisted'] == 1 && (self::isFriends($accountID, $level['extID']) || $accountID == $level['extID'])));
 	}
@@ -2231,7 +2231,7 @@ class Library {
 		
 		$accountID = $person['accountID'];
 		
-		if($unlistedLevelsForAdmins && self::isAccountAdmininstrator($accountID)) return true;
+		if($unlistedLevelsForAdmins && self::isAccountAdministrator($accountID)) return true;
 		
 		return !($list['unlisted'] > 0 && ($list['unlisted'] == 1 && (self::isFriends($accountID, $list['accountID']) || $accountID == $list['accountID'])));
 	}
@@ -2965,7 +2965,7 @@ class Library {
 	}
 	
 	public static function getClanInfo($clan, $column = "*") {
-	    require __DIR__ . "/connection.php";
+	    require __DIR__."/connection.php";
 		
 		if(isset($GLOBALS['core_cache']['clan'][$clan])) {
 			if($column != "*" && $GLOBALS['core_cache']['clan'][$clan]) return $GLOBALS['core_cache']['clan'][$clan][$column];
@@ -2993,7 +2993,7 @@ class Library {
 	}
 
 	public static function getLatestSendsByLevelID($levelID) {
-		require_once __DIR__ . "/connection.php";
+		require_once __DIR__."/connection.php";
 
 		if(isset($GLOBALS['core_cache']['latestSends'][$levelID])) return $GLOBALS['core_cache']['latestSends'][$levelID];
 
@@ -3050,10 +3050,7 @@ class Library {
 	public static function getGMDFile($levelID) {
 		require_once __DIR__."/connection.php";
 
-		if(!is_numeric($levelID)) return false;
-
 		$level = self::getLevelByID($levelID);
-
 		if(!$level) return false;
 		
 		$levelString = file_get_contents(__DIR__.'/../../data/levels/'.$levelID) ?? $level['levelString'];

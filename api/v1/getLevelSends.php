@@ -28,7 +28,7 @@ if(!$sendsInfo) {
 }
 
 $sends = [];
-foreach ($sendsInfo as $send) {
+foreach($sendsInfo AS $send) {
     $user = Library::getUserFromSearch($send["suggestBy"]);
     $sends[] = [
         "mod" => [

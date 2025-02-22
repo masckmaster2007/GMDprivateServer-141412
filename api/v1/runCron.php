@@ -8,7 +8,7 @@ $sec = new Security();
 
 // Check if the user is correctly authenticated
 $person = $sec->loginPlayer();
-if(!$user["success"]) {
+if(!$person["success"]) {
     http_response_code(401);
     exit(json_encode(['success' => false, 'cause' => 'Invalid credentials']));
 }
