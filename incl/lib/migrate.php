@@ -464,6 +464,9 @@ if(!$installed) {
 			$db->query("ALTER TABLE `platscores` ADD `coins` INT NOT NULL DEFAULT '0' AFTER `progresses`");
 			$db->query("ALTER TABLE `platscores` ADD `dailyID` INT NOT NULL DEFAULT '0' AFTER `coins`");
 		}
+	$check = $db->query("SHOW COLUMNS FROM `lists` LIKE 'rateDate'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) $db->query("ALTER TABLE `lists` ADD `rateDate` INT NOT NULL DEFAULT '0' AFTER `updateDate`");
 	$lines = file(__DIR__.'/../../config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

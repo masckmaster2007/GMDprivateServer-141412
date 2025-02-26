@@ -8,6 +8,7 @@ $sec = new Security();
 
 $person = $sec->loginPlayer();
 if(!$person["success"]) exit(CommonError::InvalidRequest);
+$accountID = $person['accountID'];
 
 $time = time();
 $str = $echoString = $userString = '';
@@ -27,24 +28,24 @@ if(isset($_POST["star"]) && $_POST["star"] == 1) $filters[] = "NOT starStars = 0
 // Difficulty filters
 switch($diff) {
 	case -1:
-		$params[] = "starDifficulty = '-1'";
+		$filters[] = "starDifficulty = '-1'";
 		break;
 	case -3:
-		$params[] = "starDifficulty = '0'";
+		$filters[] = "starDifficulty = '0'";
 		break;
 	case -2:
-		$params[] = "starDifficulty = 5 + ".$demonFilter;
+		$filters[] = "starDifficulty = 5 + ".$demonFilter;
 		break;
 	case "-";
 		break;
 	default:
-		if($diff) $params[] = "starDifficulty IN (".$diff.")";
+		if($diff) $filters[] = "starDifficulty IN (".$diff.")";
 		break;
 }
 
 // Type detection
 $str = Escape::text($_POST["str"]) ?: '';
-$pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"])."0" : 0;
+$pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"]) * 10 : 0;
 
 switch($type) {
 	case 0: // Search
@@ -88,27 +89,27 @@ switch($type) {
 		$filters[] = "accountID = '".$str."'";
 		break;
 	case 6: // Top lists
-		$params[] = "lists.starStars > 0 AND lists.starFeatured > 0";
+		$filters[] = "lists.starStars > 0 AND lists.starFeatured > 0";
 		$order = "downloads";
-		break;
-	case 11: // Rated
-		$params[] = "lists.starStars > 0";
-		$order = "downloads";
-		break;
-	case 12: // Lists from followed accounts
-		$followed = Escape::multiple_ids($_POST["followed"]);
-		$params[] = "lists.accountID IN (".$followed.")";
-		break;
-	case 13: // Friends
-		$friendsArray = Library::getFriends($accountID);
-		$friendsString = implode(",", $friendsArray);
-		$params[] = "lists.accountID IN (".$friendsString.")";
 		break;
 	case 7: // Magic
 		$order = "likes";
 		break;
+	case 11: // Rated
+		$filters[] = "lists.starStars > 0";
+		$order = "downloads";
+		break;
+	case 12: // Lists from followed accounts
+		$followed = Escape::multiple_ids($_POST["followed"]);
+		$filters[] = $followed ? "lists.accountID IN (".$followed.")" : "1 != 1";
+		break;
+	case 13: // Friends
+		$friendsArray = Library::getFriends($accountID);
+		$friendsString = implode(",", $friendsArray);
+		$filters[] = $friendsString ? "lists.accountID IN (".$friendsString.")" : "1 != 1";
+		break;
 	case 27: // Sent
-		$params[] = "suggest.suggestLevelId < 0";
+		$filters[] = "suggest.suggestLevelId < 0";
 		$order = "suggest.timestamp";
 		$morejoins = "LEFT JOIN suggest ON lists.listID * -1 LIKE suggest.suggestLevelId";
 		break;

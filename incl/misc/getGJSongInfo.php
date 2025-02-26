@@ -11,10 +11,12 @@ if(!$person["success"]) exit(CommonError::InvalidRequest);
 $songID = Escape::number($_POST['songID']);
 
 $song = Library::getSongByID($songID);
-if(!$song) exit(CommonError::InvalidRequest);
+if(!$song) {
+	$song = Library::saveNewgroundsSong($songID);
+	
+	if(!$song) exit(CommonError::InvalidRequest);
+}
 if($song['isDisabled']) exit(CommonError::Disabled);
-
-// To be added: Newgrounds support
 
 $songString = Library::getSongString($songID);
 

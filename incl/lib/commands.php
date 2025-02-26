@@ -32,7 +32,7 @@ class Commands {
 						."Example: !rate harder 7 1 4";
 				}
 
-				if(!$stars) return "To unrate level please use !unrate.";
+				if(!$stars) return "Please use !unrate to unrate level.";
 				
 				$rateLevel = Library::rateLevel($levelID, $person, $difficulty, $stars, $verifyCoins, $featured);
 				
@@ -58,6 +58,7 @@ class Commands {
 			case '!leg':
 			case '!myt':
 			case '!unfea':
+			case '!unf':
 			case '!unepi':
 			case '!unleg':
 			case '!unmyt':
@@ -67,12 +68,12 @@ class Commands {
 					'!epic' => 2, '!epi' => 2,
 					'!legendary' => 3, '!leg' => 3,
 					'!mythic' => 4, '!myt' => 4,
-					'!unfeature' => 0, '!unfea' => 0,
+					'!unfeature' => 0, '!unfea' => 0, '!unf' => 0,
 					'!unepic' => 0, '!unepi' => 0,
 					'!unlegendary' => 0, '!unleg' => 0,
 					'!unmythic' => 0, '!unmyt' => 0
 				];
-				$returnTextArray = ['unfeatured level %1$s!', 'featured level %1$s!', 'set level %1$s as epic!', 'set level %1$s as legendary!', 'set level %1$s as mythic!'];
+				$returnTextArray = ['unfeatured %1$s!', 'featured %1$s!', 'set %1$s as epic!', 'set %1$s as legendary!', 'set %1$s as mythic!'];
 				$featured = $commandArray[$command];
 				
 				$featurePermission = $featured < 2 && $level['starEpic'] == 0 ? 'Feature' : 'Epic';
@@ -92,7 +93,7 @@ class Commands {
 					'!unverifycoins' => 0, '!unvc' => 0
 				];
 				
-				$returnTextArray = ['unverified coins in level %1$s!', 'verified coins in level %1$s!'];
+				$returnTextArray = ['unverified coins in %1$s!', 'verified coins in %1$s!'];
 				$verifyCoins = $commandArray[$command];
 				
 				$featured = $level['starEpic'] + ($level['starFeatured'] ? 1 : 0);
@@ -114,9 +115,9 @@ class Commands {
 				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
 				
 				$setDaily = Library::setLevelAsDaily($levelID, $person, $type);
-				if(!$setDaily) return "Level ".$level['levelName']." is already ".($type ? 'weekly' : 'daily')."!";
+				if(!$setDaily) return $level['levelName']." is already ".($type ? 'weekly' : 'daily')."!";
 				
-				return "You successfully set level ".$level['levelName']." as ".($type ? 'weekly' : 'daily')."!".PHP_EOL
+				return "You successfully set ".$level['levelName']." as ".($type ? 'weekly' : 'daily')."!".PHP_EOL
 					."It will appear ".Library::makeTime($setDaily).'.';
 			case '!undaily':
 			case '!unda':
@@ -132,9 +133,9 @@ class Commands {
 				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
 				
 				$removeDaily = Library::removeDailyLevel($levelID, $person, $type);
-				if(!$removeDaily) return "Level ".$level['levelName']." is not ".($type ? 'weekly' : 'daily')." level!";
+				if(!$removeDaily) return $level['levelName']." is not ".($type ? 'weekly' : 'daily')." level!";
 				
-				return "You successfully removed level ".$level['levelName']." from ".($type ? 'weekly' : 'daily')." levels!";
+				return "You successfully removed ".$level['levelName']." from ".($type ? 'weekly' : 'daily')." levels!";
 			case '!event':
 			case '!ev':
 				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
@@ -155,20 +156,21 @@ class Commands {
 				}
 				
 				$setEvent = Library::setLevelAsEvent($levelID, $person, $duration, $rewards);
-				if(!$setEvent) return "Level ".$level['levelName']." is already event level!";
+				if(!$setEvent) return $level['levelName']." is already event level!";
 				
-				return "You successfully set level ".$level['levelName']." as event level!".PHP_EOL
+				return "You successfully set ".$level['levelName']." as event level!".PHP_EOL
 					."It will appear ".Library::makeTime($setEvent).'.';
 			case "!unevent":
 			case "!unev":
 				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
 
 				$removeEvent = Library::removeEventLevel($levelID, $person);
-				if(!$removeEvent) return "Level ".$level['levelName']." is not event level!";
+				if(!$removeEvent) return $level['levelName']." is not event level!";
 				
-				return "You successfully removed level ".$level['levelName']." from event levels!";
+				return "You successfully removed ".$level['levelName']." from event levels!";
 			case '!send':
 			case '!suggest':
+			case '!sug':
 				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
 			
 				$difficulty = Escape::latin($commentSplit[1]);
@@ -186,7 +188,7 @@ class Commands {
 				}
 				
 				$sendLevel = Library::sendLevel($levelID, $person, $difficulty, $stars, $featured);
-				if(!$sendLevel) return "You already suggested level ".$level['levelName']."!";
+				if(!$sendLevel) return "You already suggested ".$level['levelName']."!";
 				
 				return "You successfully sent ".$level['levelName'].' as '.$sendLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
 			case '!setacc':
@@ -204,7 +206,7 @@ class Commands {
 				
 				Library::moveLevel($levelID, $person, $player);
 				
-				return "You successfully moved level ".$level['levelName']." to user ".$player['userName']."!";
+				return "You successfully moved ".$level['levelName']." to user ".$player['userName']."!";
 			case '!lockUpdating':
 			case '!unlockUpdating':
 			case '!lu':
@@ -216,14 +218,14 @@ class Commands {
 					'!unlockUpdating' => 0, '!unlu' => 0
 				];
 				$lockUpdating = $lockUpdatingArray[$command];
-				if($level['updateLocked'] == $lockUpdating) return "Level ".$level['levelName']." is already ".(!$lockUpdating ? 'un' : '')."locked!";
+				if($level['updateLocked'] == $lockUpdating) return $level['levelName']." is already ".(!$lockUpdating ? 'un' : '')."locked!";
 				
 				Library::lockUpdatingLevel($levelID, $person, $lockUpdating);
 				
-				return "You successfully ".(!$lockUpdating ? 'un' : '')."locked level ".$level['levelName']."!";
+				return "You successfully ".(!$lockUpdating ? 'un' : '')."locked ".$level['levelName']."!";
 			case "!rename":
 			case "!re":
-				if(!Library::checkPermission($person, 'commandRename')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRename') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 			
 				unset($commentSplit[0]);
 				$newLevelName = trim(Escape::latin(implode(' ', $commentSplit)));
@@ -233,15 +235,15 @@ class Commands {
 						."Example: !rename My cool level";
 				}
 				
-				if($level['levelName'] == $newLevelName) return "Level ".$level['levelName']." already has this name!";
+				if($level['levelName'] == $newLevelName) return $level['levelName']." already has this name!";
 				
 				Library::renameLevel($levelID, $person, $newLevelName);
 				
-				return "You successfully renamed level ".$level['levelName']." to ".$newLevelName."!";
+				return "You successfully renamed ".$level['levelName']." to ".$newLevelName."!";
 			case "!password":
 			case "!pass":
 			case "!p":
-				if(!Library::checkPermission($person, 'commandPass')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandPass') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 				
 				if(!$commentSplit[1] || !is_numeric($commentSplit[1]) || strlen($commentSplit[1]) > 6) {
 					return "Incorrect usage!".PHP_EOL
@@ -251,14 +253,14 @@ class Commands {
 				
 				$newPassword = sprintf("%06d", Escape::number($commentSplit[1]));
 				
-				if($level['password'] == '1'.$newPassword || $level['password'].'000000' == '1'.$newPassword) return "Level ".$level['levelName']." already has this password!";
+				if($level['password'] == '1'.$newPassword || $level['password'].'000000' == '1'.$newPassword) return $level['levelName']." already has this password!";
 				
 				Library::changeLevelPassword($levelID, $person, $newPassword);
 				
-				return "You successfully changed password of level ".$level['levelName'].' to '.$newPassword."!";
+				return "You successfully changed password of ".$level['levelName'].' to '.$newPassword."!";
 			case "!song":
 			case "!s":
-				if(!Library::checkPermission($person, 'commandSong')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSong') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 			
 				$songID = Escape::number($commentSplit[1]);
 				if(!$songID) {
@@ -267,17 +269,17 @@ class Commands {
 						."Example: !song 1967605";
 				}
 				
-				if($level["songID"] == $songID) return "Level ".$level['levelName']." already has this song!";
+				if($level["songID"] == $songID) return $level['levelName']." already has this song!";
 				
 				$song = Library::getSongByID($songID);
 				if(!$song) return "This song doesn't exist!";
 				
 				Library::changeLevelSong($levelID, $person, $songID);
 				
-				return "You successfully changed song of level ".$level['levelName']." to ".Escape::translit($song['authorName'])." - ".Escape::translit($song['name'])."!";
+				return "You successfully changed song of ".$level['levelName']." to ".Escape::translit($song['authorName'])." - ".Escape::translit($song['name'])."!";
 			case "!description":
 			case "!desc":
-				if(!Library::checkPermission($person, 'commandDescription')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDescription') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 			
 				unset($commentSplit[0]);
 				$newLevelDesc = Library::escapeDescriptionCrash(trim(Escape::text(implode(' ', $commentSplit))));
@@ -287,11 +289,11 @@ class Commands {
 						."Example: !description This is my cool level i made in 3 hours. Please enjoy!";
 				}
 				
-				if($level['levelDesc'] == $newLevelDesc) return "Level ".$level['levelName']." already has this description!";
+				if(Escape::url_base64_decode($level['levelDesc']) == $newLevelDesc) return $level['levelName']." already has this description!";
 				
 				Library::changeLevelDescription($levelID, $person, $newLevelDesc);
 				
-				return "You successfully changed description of level ".$level['levelName']." to:".PHP_EOL
+				return "You successfully changed description of ".$level['levelName']." to:".PHP_EOL
 					.$newLevelDesc;
 			case "!public":
 			case "!unlist":
@@ -299,7 +301,7 @@ class Commands {
 			case "!pub":
 			case "!unl":
 			case "!fr":
-				if(!Library::checkPermission($person, 'commandPublic')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandPublic') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 			
 				$privacyArray = [
 					'!public' => 0, '!pub' => 0,
@@ -309,11 +311,11 @@ class Commands {
 				$privacyText = ['public', 'only for friends', 'unlisted'];
 				$privacy = $privacyArray[$command];
 				
-				if($level['unlisted'] == $privacy) return "Level ".$level['levelName']." already is ".$privacyText[$privacy]."!";
+				if($level['unlisted'] == $privacy) return $level['levelName']." is already ".$privacyText[$privacy]."!";
 				
 				Library::changeLevelPrivacy($levelID, $person, $privacy);
 				
-				return "You successfully made level ".$level['levelName']." ".$privacyText[$privacy]."!";
+				return "You successfully made ".$level['levelName']." ".$privacyText[$privacy]."!";
 			case "!sharecp":
 			case "!cp":
 				if(!Library::checkPermission($person, 'commandSharecp')) return "You don't have permissions to use command ".$command."!";
@@ -321,37 +323,228 @@ class Commands {
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
 				if(!$player) return "This user was not found!";
 				
-				if($player['extID'] == $level['extID']) return "User ".$player['userName']." is creator of level ".$level['levelName']."!";
+				if($player['extID'] == $level['extID']) return "User ".$player['userName']." is creator of ".$level['levelName']."!";
 				
 				$shareCreatorPoints = Library::shareCreatorPoints($levelID, $person, $player['userID']);
-				if(!$shareCreatorPoints) return "User ".$player['userName']." have already been shared Creator Points from level ".$level['levelName']."!";
+				if(!$shareCreatorPoints) return "User ".$player['userName']." have already been shared Creator Points from ".$level['levelName']."!";
 				
-				return "You successfully shared Creator Points from level ".$level['levelName']." with user ".$player['userName']."!";
+				return "You successfully shared Creator Points from ".$level['levelName']." with user ".$player['userName']."!";
 			case '!lockComments':
 			case '!unlockComments':
 			case '!lc':
 			case '!unlc':
-				if(!Library::checkPermission($person, 'commandLockComments')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandLockComments') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 				
 				$lockCommentingArray = [
 					'!lockComments' => 1, '!lc' => 1,
 					'!unlockComments' => 0, '!unlc' => 0
 				];
 				$lockCommenting = $lockCommentingArray[$command];
-				if($level['commentLocked'] == $lockCommenting) return "Comments on level ".$level['levelName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
+				if($level['commentLocked'] == $lockCommenting) return "Comments on ".$level['levelName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
 				
 				Library::lockCommentingOnLevel($levelID, $person, $lockCommenting);
 				
-				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on level ".$level['levelName']."!";
+				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on ".$level['levelName']."!";
 			case '!delete':
 			case '!delet':
 			case '!del':
 			case '!d':
-				if(!Library::checkPermission($person, 'commandDelete')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDelete') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
 				
 				Library::deleteLevel($levelID, $person);
 				
-				return "You successfully deleted level ".$level['levelName']."!";
+				return "You successfully deleted ".$level['levelName']."!";
+		}
+		
+		return "Command ".$command." was not found.";
+	}
+	
+	public static function processListCommand($comment, $list, $person) {
+		require_once __DIR__.'/mainLib.php';
+		require_once __DIR__.'/exploitPatch.php';
+		
+		if(substr($comment, 0, 1) != '!') return false;
+		
+		$listID = $list['listID'];
+		
+		$commentSplit = explode(' ', $comment);
+		$increaseSplit = 0;
+		$command = $commentSplit[0];
+		
+		switch($command) {
+			case '!rate':
+			case '!r':
+				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+
+				$reward = Escape::number($commentSplit[1]);
+				$difficulty = Escape::latin($commentSplit[2]);
+				if(!is_numeric($commentSplit[3])) {
+					$increaseSplit++;
+					$difficulty .= " ".Escape::latin($commentSplit[2 + $increaseSplit]);
+				}
+				$featured = Escape::number($commentSplit[3 + $increaseSplit]);
+				$levelsCount = Escape::number($commentSplit[4 + $increaseSplit]);
+				
+				if(empty($levelsCount)) $levelsCount = count(explode(',', $list['listlevels']));
+				
+				if(!is_numeric($reward) || !$difficulty || !is_numeric($featured)) {
+					return "Incorrect usage!".PHP_EOL
+						."!rate *reward amount* *difficulty* *is featured* *required levels amount to complete list*".PHP_EOL
+						."Example: !rate 50 harder 1 7";
+				}
+
+				if(!$reward) return "Please use !unrate to unrate list.";
+				
+				$rateList = Library::rateList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
+				
+				return "You successfully rated ".$list['listName'].' as '.$rateList.', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
+			case '!unrate':
+			case '!unr':
+				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				
+				Library::rateList($listID, $person, 0, $list['starDifficulty'], 0, 0);
+				
+				return "You successfully unrated ".$list['listName'].'!';
+			case '!feature':
+			case '!unfeature':
+			case '!fea':
+			case '!unfea':
+			case '!f':
+			case '!unf':
+				if(!Library::checkPermission($person, 'commandFeature')) return "You don't have permissions to use command ".$command."!";
+				
+				$commandArray = [
+					'!feature' => 1, '!fea' => 1, '!f' => 1,
+					'!unfeature' => 0, '!unfea' => 0, '!unf' => 0,
+				];
+				$featuredValue = $commandArray[$command];
+				
+				Library::rateList($listID, $person, $list['starStars'], $list['starDifficulty'], $featuredValue, $list['countForReward']);
+				
+				return "You successfully ".(!$featuredValue ? 'un' : '')."featured ".$list['listName'].'!';
+			case '!delete':
+			case '!delet':
+			case '!del':
+			case '!d':
+				if(!Library::checkPermission($person, 'commandDelete') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				
+				Library::deleteList($listID, $person);
+				
+				return "You successfully deleted ".$list['listName']."!";
+			case "!public":
+			case "!unlist":
+			case "!friends":
+			case "!pub":
+			case "!unl":
+			case "!fr":
+				if(!Library::checkPermission($person, 'commandPublic') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+			
+				$privacyArray = [
+					'!public' => 0, '!pub' => 0,
+					'!friends' => 1, '!fr' => 1,
+					'!unlist' => 2, '!unl' => 2,
+				];
+				$privacyText = ['public', 'only for friends', 'unlisted'];
+				$privacy = $privacyArray[$command];
+				
+				if($list['unlisted'] == $privacy) return $list['listName']." is already ".$privacyText[$privacy]."!";
+				
+				Library::changeListPrivacy($listID, $person, $privacy);
+				
+				return "You successfully made ".$list['listName']." ".$privacyText[$privacy]."!";
+			case '!setacc':
+			case '!account':
+			case '!move':
+			case '!sa':
+			case '!acc':
+			case '!m':
+				if(!Library::checkPermission($person, 'commandSetacc')) return "You don't have permissions to use command ".$command."!";
+			
+				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
+				if(!$player) return "This user was not found!";
+				
+				if($player['extID'] == $list['accountID']) return "User ".$player['userName']." already owns ".$list['listName']."!";
+				
+				Library::moveList($listID, $person, $player);
+				
+				return "You successfully moved ".$list['listName']." to user ".$player['userName']."!";
+			case "!rename":
+			case "!re":
+				if(!Library::checkPermission($person, 'commandRename') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+			
+				unset($commentSplit[0]);
+				$newListName = trim(Escape::latin(implode(' ', $commentSplit)));
+				if(!$newListName) {
+					return "Incorrect usage!".PHP_EOL
+						."!rename *list name*".PHP_EOL
+						."Example: !rename My cool list";
+				}
+				
+				if($list['listName'] == $newListName) return $list['listName']." already has this name!";
+				
+				Library::renameList($listID, $person, $newListName);
+				
+				return "You successfully renamed ".$list['listName']." to ".$newListName."!";
+			case "!description":
+			case "!desc":
+				if(!Library::checkPermission($person, 'commandDescription') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+			
+				unset($commentSplit[0]);
+				$newListDesc = Library::escapeDescriptionCrash(trim(Escape::text(implode(' ', $commentSplit))));
+				if(!$newListDesc) {
+					return "Incorrect usage!".PHP_EOL
+						."!description *list description*".PHP_EOL
+						."Example: !description This is list with my favorite levels. Please enjoy!";
+				}
+				
+				if(Escape::url_base64_decode($list['listDesc']) == $newListDesc) return $list['listName']." already has this description!";
+				
+				Library::changeListDescription($listID, $person, $newListDesc);
+				
+				return "You successfully changed description of ".$list['listName']." to:".PHP_EOL
+					.$newListDesc;
+			case '!lockComments':
+			case '!unlockComments':
+			case '!lc':
+			case '!unlc':
+				if(!Library::checkPermission($person, 'commandLockComments') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				
+				$lockCommentingArray = [
+					'!lockComments' => 1, '!lc' => 1,
+					'!unlockComments' => 0, '!unlc' => 0
+				];
+				$lockCommenting = $lockCommentingArray[$command];
+				if($list['commentLocked'] == $lockCommenting) return "Comments on ".$list['listName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
+				
+				Library::lockCommentingOnList($listID, $person, $lockCommenting);
+				
+				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on ".$list['listName']."!";
+			case '!send':
+			case '!suggest':
+			case '!sug':
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+			
+				$reward = Escape::number($commentSplit[1]);
+				$difficulty = Escape::latin($commentSplit[2]);
+				if(!is_numeric($commentSplit[3])) {
+					$increaseSplit++;
+					$difficulty .= " ".Escape::latin($commentSplit[2 + $increaseSplit]);
+				}
+				$featured = Escape::number($commentSplit[3 + $increaseSplit]);
+				$levelsCount = Escape::number($commentSplit[4 + $increaseSplit]);
+				
+				if(empty($levelsCount)) $levelsCount = count(explode(',', $list['listlevels']));
+				
+				if(!is_numeric($reward) || !$difficulty || !is_numeric($featured)) {
+					return "Incorrect usage!".PHP_EOL
+						."!send *reward amount* *difficulty* *is featured* *required levels amount to complete list*".PHP_EOL
+						."Example: !send 50 harder 1 7";
+				}
+				
+				$sendList = Library::sendList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
+				if(!$sendList) return "You already suggested ".$list['listName']."!";
+				
+				return "You successfully sent ".$list['listName'].' as '.$sendList.', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
 		}
 		
 		return "Command ".$command." was not found.";

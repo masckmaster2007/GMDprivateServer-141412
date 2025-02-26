@@ -125,7 +125,10 @@ class Action {
 	const CronMisc = 43;
 	const CronSongsUsage = 44;
 	
-	// These three actions are no more/never were used
+	const LevelVoteNormal = 45;
+	const LevelVoteDemon = 46;
+	
+	// Unused
 	const GJPSessionGrant = 16;
 	const LevelReport = 20;
 	const LevelDescriptionChange = 21;
@@ -133,21 +136,24 @@ class Action {
 
 class ModeratorAction {
 	const LevelRate = 1;
-	const LevelFeature = 2;
-	const LevelCoinsVerify = 3;
-	const LevelEpic = 4;
 	const LevelDailySet = 5;
 	const LevelDeletion = 6;
 	const LevelCreatorChange = 7;
 	const LevelRename = 8;
 	const LevelPasswordChange = 9;
-	const LevelDemonChange = 10;
 	const LevelCreatorPointsShare = 11;
 	const LevelPrivacyChange = 12;
 	const LevelDescriptionChange = 13;
-	const LevelToggleLDM = 14;
-	const LeaderboardsBan = 15;
 	const LevelChangeSong = 16;
+	const LevelLockUpdating = 29;
+	const LevelLockCommenting = 38;
+	const LevelSuggest = 41;
+	const LevelEventSet = 44;
+
+	const PersonBan = 28;
+	
+	// To be done with dashboard
+	const LevelSuggestRemove = 40;
 	const MapPackCreate = 17;
 	const GauntletCreate = 18;
 	const SongChange = 19;
@@ -159,22 +165,25 @@ class ModeratorAction {
 	const QuestCreate = 25;
 	const AccountCredentialsChange = 26;
 	const SFXChange = 27;
-	const PersonBan = 28;
-	const LevelLockUpdating = 29;
+	const VaultCodeCreate = 42;
+	const VaultCodeChange = 43;
+	
 	const ListRate = 30;
 	const ListSuggest = 31;
-	const ListFeature = 32;
 	const ListPrivacyChange = 33;
 	const ListDeletion = 34;
 	const ListCreatorChange = 35;
-	const ListNameChange = 36;
+	const ListRename = 36;
 	const ListDescriptionChange = 37;
-	const LevelLockCommenting = 38;
 	const ListLockCommenting = 39;
-	const LevelSuggestRemove = 40;
-	const LevelSuggest = 41;
-	const VaultCodeCreate = 42;
-	const VaultCodeChange = 43;
-	const LevelEventSet = 44;
+	
+	// Unused
+	const LevelFeature = 2;
+	const LevelCoinsVerify = 3;
+	const LevelEpic = 4;
+	const LevelDemonChange = 10;
+	const LevelToggleLDM = 14;
+	const LeaderboardsBan = 15;
+	const ListFeature = 32;
 }
 ?>

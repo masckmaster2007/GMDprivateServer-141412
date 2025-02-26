@@ -14,6 +14,9 @@ $rating = Escape::number($_POST['rating']);
 $ratingArray = [0, 1, 2, 3, 4, 5];
 $ratingNumber = $ratingArray[$rating - 1] ?? 0;
 
+$level = Library::getLevelByID($levelID);
+if(!$level) exit(CommonError::InvalidRequest);
+
 switch(true) {
 	case Library::checkPermission($person, 'actionRateStars'):
 		$featured = $level['starEpic'] + ($level['starFeatured'] ? 1 : 0);
@@ -24,7 +27,7 @@ switch(true) {
 	case $normalLevelsVotes:
 		if($level['starStars']) exit(CommonError::InvalidRequest);
 		
-		Library::voteForLevelDifficulty($levelID, $ratingNumber);
+		Library::voteForLevelDifficulty($levelID, $person, $ratingNumber);
 		
 		exit(CommonError::Success);
 }

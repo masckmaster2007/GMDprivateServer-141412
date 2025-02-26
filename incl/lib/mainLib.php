@@ -388,6 +388,14 @@ class Library {
 	
 	public static function banPerson($modID, $person, $reason, $banType, $personType, $expires) {
 		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$moderatorPerson = [
+			'accountID' => $modID,
+			'IP' => $IP
+		];
 		
 		if($banType == 4) {
 			switch($personType) {
@@ -416,8 +424,7 @@ class Library {
 		$banID = $db->lastInsertId();
 		
 		if($modID != 0) {
-			$query = $db->prepare("INSERT INTO modactions (type, value, value2, value3, value4, value5, value6, timestamp, account) VALUES ('28', :value, :value2, :value3, :value4, :value5, :value6, :timestamp, :account)");
-			$query->execute([':value' => $person, ':value2' => $reason, ':value3' => $personType, ':value4' => $banType, ':value5' => $expires, ':value6' => 1, ':timestamp' => time(), ':account' => $_SESSION['accountID']]);
+			self::logModeratorAction($moderatorPerson, ModeratorAction::PersonBan, $person, $reason, $personType, $banType, $expires, 1);
 			//$this->sendBanWebhook($banID, $modID);
 		}
 		
@@ -436,6 +443,14 @@ class Library {
 	
 	public static function unbanPerson($banID, $modID) {
 		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		
+		$moderatorPerson = [
+			'accountID' => $modID,
+			'IP' => $IP
+		];
 		
 		$ban = self::getBanByID($banID);
 		if(!$ban) return false;
@@ -448,8 +463,7 @@ class Library {
 		$unban = $db->prepare('UPDATE bans SET isActive = 0 WHERE banID = :banID');
 		$unban->execute([':banID' => $banID]);
 		if($modID != 0) {
-			$query = $db->prepare("INSERT INTO modactions (type, value, value2, value3, value4, value5, value6, timestamp, account) VALUES ('28', :value, :value2, :value3, :value4, :value5, :value6, :timestamp, :account)");
-			$query->execute([':value' => $ban['person'], ':value2' => $ban['reason'], ':value3' => $ban['personType'], ':value4' => $ban['banType'], ':value5' => $ban['expires'], ':value6' => 0, ':timestamp' => time(), ':account' => $modID]);
+			self::logModeratorAction($moderatorPerson, ModeratorAction::PersonBan, $ban['person'], $ban['reason'], $ban['personType'], $ban['banType'], $ban['expires'], 0);
 			//$this->sendBanWebhook($banID, $modID);
 		}
 		
@@ -1544,7 +1558,7 @@ class Library {
 		}
 	}
 	
-	public static function rateLevel($levelID, $person, $difficulty, $stars, $verifyCoins, $featured) {
+	public static function rateLevel($levelID, $person, $difficulty, $stars, $verifyCoins, $featuredValue) {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
@@ -1553,8 +1567,8 @@ class Library {
 		
 		$realDifficulty = self::getLevelDifficulty($difficulty);
 		
-		if($featured) {
-			$epic = $featured - 1;
+		if($featuredValue) {
+			$epic = $featuredValue - 1;
 			$featured = $level['starFeatured'] ?: self::nextFeaturedID();
 		} else $epic = $featured = 0;
 		
@@ -1564,6 +1578,8 @@ class Library {
 		
 		$rateLevel = $db->prepare("UPDATE levels SET starDifficulty = :starDifficulty, difficultyDenominator = 10, starStars = :starStars, starFeatured = :starFeatured, starEpic = :starEpic, starCoins = :starCoins, starDemon = :starDemon, starDemonDiff = :starDemonDiff, starAuto = :starAuto, rateDate = :rateDate WHERE levelID = :levelID AND isDeleted = 0");
 		$rateLevel->execute([':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starEpic' => $epic, ':starCoins' => $starCoins, ':starDemon' => $starDemon, ':starDemonDiff' => $demonDiff, ':starAuto' => $realDifficulty['auto'], ':rateDate' => time(), ':levelID' => $levelID]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelRate, $realDifficulty['difficulty'], $stars, $levelID, $featuredValue, $starCoins);
 		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
 		
@@ -1593,6 +1609,8 @@ class Library {
 		$setDaily = $db->prepare("INSERT INTO dailyfeatures (levelID, type, timestamp)
 			VALUES (:levelID, :type, :timestamp)");
 		$setDaily->execute([':levelID' => $levelID, ':type' => $type, ':timestamp' => $dailyTime]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelDailySet, 1, $dailyTime, $levelID, $type);
 		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
 		
@@ -1638,6 +1656,8 @@ class Library {
 			VALUES (:levelID, :timestamp, :duration, :rewards)");
 		$setEvent->execute([':levelID' => $levelID, ':timestamp' => $eventTime, ':duration' => $eventTime + $duration, ':rewards' => $rewards]);
 		
+		self::logModeratorAction($person, ModeratorAction::LevelEventSet, $eventTime + $duration, $rewards, $levelID);
+		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
 		
 		return $eventTime;
@@ -1682,6 +1702,8 @@ class Library {
 		$sendLevel = $db->prepare("INSERT INTO suggest (suggestBy, suggestLevelId, suggestDifficulty, suggestStars, suggestFeatured, suggestAuto, suggestDemon, timestamp)
 			VALUES (:accountID, :levelID, :starDifficulty, :starStars, :starFeatured, :starAuto, :starDemon, :timestamp)");
 		$sendLevel->execute([':accountID' => $accountID, ':levelID' => $levelID, ':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $stars, ':starFeatured' => $featured, ':starAuto' => $realDifficulty['auto'], ':starDemon' => $realDifficulty['demon'], ':timestamp' => time()]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelSuggest, $stars, $realDifficulty['difficulty'], $levelID, $featured);
 		
 		return $realDifficulty['name'];
 	}
@@ -1733,8 +1755,14 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		$targetAccountID = $player['extID'];
+		$targetUserID = $player['userID'];
+		$targetUserName = $player['userName'];
+		
 		$setAccount = $db->prepare("UPDATE levels SET extID = :extID, userID = :userID WHERE levelID = :levelID AND isDeleted = 0");
-		$setAccount->execute([':extID' => $player['extID'], ':userID' => $player['userID'], ':levelID' => $levelID]);
+		$setAccount->execute([':extID' => $targetAccountID, ':userID' => $targetUserID, ':levelID' => $levelID]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelCreatorChange, $targetUserName, $targetUserID, $levelID);
 		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
 		
@@ -1746,6 +1774,8 @@ class Library {
 		
 		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelLockUpdating, $lockUpdating, '', $levelID);
 		
 		return true;
 	}
@@ -1773,8 +1803,12 @@ class Library {
 	public static function renameLevel($levelID, $person, $levelName) {
 		require __DIR__."/connection.php";
 		
+		$level = self::getLevelByID($levelID);
+		
 		$renameLevel = $db->prepare("UPDATE levels SET levelName = :levelName WHERE levelID = :levelID AND isDeleted = 0");
 		$renameLevel->execute([':levelID' => $levelID, ':levelName' => $levelName]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelRename, $levelName, $level['levelName'], $levelID);
 		
 		return true;
 	}
@@ -1784,8 +1818,12 @@ class Library {
 		
 		if($newPassword == '000000') $newPassword = '';
 		
+		$level = self::getLevelByID($levelID);
+		
 		$changeLevelPassword = $db->prepare("UPDATE levels SET password = :password WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelPassword->execute([':levelID' => $levelID, ':password' => "1".$newPassword]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelPasswordChange, "1".$newPassword, $level['password'], $levelID);
 		
 		return true;
 	}
@@ -1795,8 +1833,12 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		$level = self::getLevelByID($levelID);
+		
 		$changeLevelSong = $db->prepare("UPDATE levels SET songID = :songID WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelSong->execute([':levelID' => $levelID, ':songID' => $songID]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelChangeSong, $songID, $level['songID'], $levelID);
 		
 		if($automaticCron) Cron::updateSongsUsage($person, false);
 		
@@ -1807,14 +1849,17 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
 		
+		$userID = $person['userID'];
+		
+		$level = self::getLevelByID($levelID);
+		
 		$description = Escape::url_base64_encode($description);
 		
 		$changeLevelDescription = $db->prepare("UPDATE levels SET levelDesc = :levelDesc WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelDescription->execute([':levelID' => $levelID, ':levelDesc' => $description]);
 		
-		$level = self::getLevelByID($levelID);
-		
-		self::logAction($person, Action::LevelChange, $level['levelName'], $description, $levelID);
+		if($level['userID'] == $userID) self::logAction($person, Action::LevelChange, $level['levelName'], $description, $levelID);
+		else self::logModeratorAction($person, ModeratorAction::LevelDescriptionChange, $description, $level['levelDesc'], $levelID);
 		
 		return true;
 	}
@@ -1824,6 +1869,8 @@ class Library {
 		
 		$changeLevelPrivacy = $db->prepare("UPDATE levels SET unlisted = :privacy, unlisted2 = :privacy WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelPrivacy->execute([':levelID' => $levelID, ':privacy' => $privacy]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelPrivacyChange, $privacy, '', $levelID);
 		
 		return true;
 	}
@@ -1845,6 +1892,8 @@ class Library {
 			VALUES (:levelID, :userID)");
 		$shareCreatorPoints->execute([':levelID' => $levelID, ':userID' => $targetUserID]);
 		
+		self::logModeratorAction($person, ModeratorAction::LevelCreatorPointsShare, $targetUserID, '', $levelID);
+		
 		if($automaticCron) Cron::updateCreatorPoints($person, false);
 		
 		return true;
@@ -1855,6 +1904,8 @@ class Library {
 
 		$lockLevel = $db->prepare("UPDATE levels SET commentLocked = :commentLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':commentLocked' => $lockCommenting, ':levelID' => $levelID]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelLockCommenting, $lockCommenting, '', $levelID);
 		
 		return true;
 	}
@@ -1879,10 +1930,15 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		$userID = $person['userID'];
+		
+		$level = self::getLevelByID($levelID);
+		
 		$deleteLevel = $db->prepare("UPDATE levels SET isDeleted = 1 WHERE levelID = :levelID AND isDeleted = 0");
 		$deleteLevel->execute([':levelID' => $levelID]);
 		
-		self::logAction($person, Action::LevelDeletion, $levelID);
+		if($level['userID'] == $userID) self::logAction($person, Action::LevelDeletion, $levelID, $level['levelName']);
+		else self::logModeratorAction($person, ModeratorAction::LevelDeletion, 1, $level['levelName'], $levelID);
 		
 		if(file_exists(__DIR__."/../../data/levels/".$levelID)) rename(__DIR__."/../../data/levels/".$levelID, __DIR__."/../../data/levels/deleted/".$levelID);
 		
@@ -1891,14 +1947,18 @@ class Library {
 		return true;
 	}
 	
-	public static function voteForLevelDifficulty($levelID, $rating) {
+	public static function voteForLevelDifficulty($levelID, $person, $rating) {
 		require __DIR__."/connection.php";
+		
+		if(self::isVotedForLevelDifficulty($levelID, $person, $rating > 5)) return false;
 		
 		$level = self::getLevelByID($levelID);
 		$realDifficulty = self::getLevelDifficulty(self::prepareDifficultyForRating(($level['starDifficulty'] + $rating) / ($level['difficultyDenominator'] + 1)));
 		
-		$voteForLevelDifficulty = $db->prepare("UPDATE levels SET starDifficulty = starDifficulty + :rating, difficultyDenominator = difficultyDenominator + 1, starDemonDiff = :starDemonDiff WHERE levelID = :levelID");
-		$voteForLevelDifficulty->execute([':rating' => $rating, ':levelID' => $levelID, ':starDemonDiff' => $realDifficulty['demon']]);
+		$voteForLevelDifficulty = $db->prepare("UPDATE levels SET starDifficulty = starDifficulty + :rating, difficultyDenominator = difficultyDenominator + 1, starDemonDiff = :starDemonDiff, starAuto = :starAuto WHERE levelID = :levelID");
+		$voteForLevelDifficulty->execute([':rating' => $rating, ':levelID' => $levelID, ':starDemonDiff' => $realDifficulty['demon'], ':starAuto' => $realDifficulty['auto']]);
+		
+		self::logAction($person, ($rating > 5 ? Action::LevelVoteDemon : Action::LevelVoteNormal), $levelID, $rating);
 		
 		return true;
 	}
@@ -2066,6 +2126,70 @@ class Library {
 		return $getLevelScores;
 	}
 	
+	public static function getGMDFile($levelID) {
+		require_once __DIR__."/connection.php";
+
+		$level = self::getLevelByID($levelID);
+		if(!$level) return false;
+		
+		$levelString = file_get_contents(__DIR__.'/../../data/levels/'.$levelID) ?? $level['levelString'];
+		$gmdFile = '<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict>';
+		
+		$gmdFile .= '<k>k1</k><i>'.$levelID.'</i>';
+		$gmdFile .= '<k>k2</k><s>'.$level['levelName'].'</s>';
+		$gmdFile .= '<k>k3</k><s>'.$level['levelDesc'].'</s>';
+		$gmdFile .= '<k>k4</k><s>'.$levelString.'</s>';
+		$gmdFile .= '<k>k5</k><s>'.$level['userName'].'</s>';
+		$gmdFile .= '<k>k6</k><i>'.$level['userID'].'</i>';
+		$gmdFile .= '<k>k8</k><i>'.$level['audioTrack'].'</i>';
+		$gmdFile .= '<k>k11</k><i>'.$level['downloads'].'</i>';
+		$gmdFile .= '<k>k13</k><t />';
+		$gmdFile .= '<k>k16</k><i>'.$level['levelVersion'].'</i>';
+		$gmdFile .= '<k>k21</k><i>2</i>';
+		$gmdFile .= '<k>k23</k><i>'.$level['levelLength'].'</i>';
+		$gmdFile .= '<k>k42</k><i>'.$level['levelID'].'</i>';
+		$gmdFile .= '<k>k45</k><i>'.$level['songID'].'</i>';
+		$gmdFile .= '<k>k47</k><t />';
+		$gmdFile .= '<k>k48</k><i>'.$level['objects'].'</i>';
+		$gmdFile .= '<k>k50</k><i>'.$level['binaryVersion'].'</i>';
+		$gmdFile .= '<k>k87</k><i>556365614873111</i>';
+		$gmdFile .= '<k>k101</k><i>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</i>';
+		$gmdFile .= '<k>kl1</k><i>0</i>';
+		$gmdFile .= '<k>kl2</k><i>0</i>';
+		$gmdFile .= '<k>kl3</k><i>1</i>';
+		$gmdFile .= '<k>kl5</k><i>1</i>';
+		$gmdFile .= '<k>kl6</k><k>kI6</k><d><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s></d>';
+		
+		$gmdFile .= '</dict></plist>';
+
+		return $gmdFile;
+	}
+	
+	public static function getLatestSendsByLevelID($levelID) {
+		require_once __DIR__."/connection.php";
+
+		if(isset($GLOBALS['core_cache']['latestSends'][$levelID])) return $GLOBALS['core_cache']['latestSends'][$levelID];
+
+		$sendsInfo = $db->prepare("SELECT * FROM suggest WHERE suggestLevelId = :levelID ORDER BY timestamp DESC");
+		$sendsInfo->execute([":levelID" => $levelID]);
+		$sendsInfo = $query->fetchAll();
+
+		$GLOBALS['core_cache']['latestSends'][$levelID] = $sendsInfo;
+
+		return $sendsInfo;
+	}
+	
+	public static function isVotedForLevelDifficulty($levelID, $person, $isDemonVote) {
+		require_once __DIR__."/connection.php";
+	
+		$filters[] = "type = ".($isDemonVote ? Action::LevelVoteDemon : Action::LevelVoteNormal);
+		$filters[] = "value = ".$levelID;
+	
+		$isVoted = self::getPersonActions($person, $filters);
+		
+		return count($isVoted) > 0;
+	}
+	
 	/*
 		Lists-related functions
 	*/
@@ -2210,18 +2334,18 @@ class Library {
 		return $listID;
 	}
 	
-	public static function deleteList($person, $listID) {
+	public static function deleteList($listID, $person) {
 		require __DIR__."/connection.php";
 		
 		$accountID = $person['accountID'];
 		
 		$list = self::getListByID($listID);
-		if(!$list || $list['accountID'] != $accountID) return false;
 		
 		$deleteList = $db->prepare("DELETE FROM lists WHERE listID = :listID");
 		$deleteList->execute([':listID' => $listID]);
 		
-		self::logAction($person, Action::ListDeletion, $list['listName'], $list['listLevels'], $listID, $list['difficulty'], $list['unlisted']);
+		if($list['accountID'] == $accountID) self::logAction($person, Action::ListDeletion, $list['listName'], $list['listLevels'], $listID, $list['difficulty'], $list['unlisted']);
+		else self::logModeratorAction($person, ModeratorAction::ListDeletion, 1, $list['listName'], $list['listLevels'], $listID, $list['difficulty'], $list['unlisted']);
 		
 		return true;
 	}
@@ -2234,6 +2358,176 @@ class Library {
 		if($unlistedLevelsForAdmins && self::isAccountAdministrator($accountID)) return true;
 		
 		return !($list['unlisted'] > 0 && ($list['unlisted'] == 1 && (self::isFriends($accountID, $list['accountID']) || $accountID == $list['accountID'])));
+	}
+	
+	public static function rateList($listID, $person, $reward, $difficulty, $featuredValue, $levelsCount) {
+		require __DIR__."/../../config/misc.php";
+		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
+		
+		$list = self::getListByID($listID);
+		
+		$realDifficulty = self::getListDifficulty($difficulty);
+		
+		$featured = $featuredValue ? 1 : 0;
+		
+		$rateList = $db->prepare("UPDATE lists SET starDifficulty = :starDifficulty, starStars = :starStars, starFeatured = :starFeatured, rateDate = :rateDate, countForReward = :levelsCount WHERE listID = :listID");
+		$rateList->execute([':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $reward, ':starFeatured' => $featured, ':rateDate' => time(), ':levelsCount' => $levelsCount, ':listID' => $listID]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListRate, $reward, $realDifficulty['difficulty'], $listID, $featured, $levelsCount);
+		
+		return $realDifficulty['name'];
+	}
+	
+	public static function getListDifficulty($difficulty) {
+		switch(strtolower($difficulty)) {
+			case 0:
+			case "auto":
+				return ["name" => "Auto", "difficulty" => 0];
+			case 1:
+			case "easy":
+				return ["name" => "Easy", "difficulty" => 1];
+			case 2:
+			case "normal":
+				return ["name" => "Normal", "difficulty" => 2];
+			case 3:
+			case "hard":
+				return ["name" => "Hard", "difficulty" => 3];
+			case 4:
+			case "harder":
+				return ["name" => "Harder", "difficulty" => 4];
+			case 5:
+			case "insane":
+				return ["name" => "Insane", "difficulty" => 5];
+			case 6:
+			case "easydemon":
+			case "easy_demon":
+			case "easy demon":
+				return ["name" => "Easy Demon", "difficulty" => 6];
+			case 7:
+			case "mediumdemon":
+			case "medium_demon":
+			case "medium demon":
+				return ["name" => "Medium Demon", "difficulty" => 7];
+			case 8:
+			case "demon":
+			case "harddemon":
+			case "hard_demon":
+			case "hard demon":
+				return ["name" => "Hard Demon", "difficulty" => 8];
+			case 9:
+			case "insanedemon":
+			case "insane_demon":
+			case "insane demon":
+				return ["name" => "Insane Demon", "difficulty" => 9];
+			case 10:
+			case "extremedemon":
+			case "extreme_demon":
+			case "extreme demon":
+				return ["name" => "Extreme Demon", "difficulty" => 10];
+			default:
+				return ["name" => "N/A", "difficulty" => 0];
+		}
+	}
+	
+	public static function changeListPrivacy($listID, $person, $privacy) {
+		require __DIR__."/connection.php";
+		
+		$changeListPrivacy = $db->prepare("UPDATE lists SET unlisted = :privacy WHERE listID = :listID");
+		$changeListPrivacy->execute([':listID' => $listID, ':privacy' => $privacy]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListPrivacyChange, $privacy, '', $listID);
+		
+		return true;
+	}
+	
+	public static function moveList($listID, $person, $player) {
+		require __DIR__."/../../config/misc.php";
+		require __DIR__."/connection.php";
+		require_once __DIR__."/cron.php";
+		
+		$targetAccountID = $player['extID'];
+		$targetUserID = $player['userID'];
+		$targetUserName = $player['userName'];
+		
+		$setAccount = $db->prepare("UPDATE lists SET accountID = :targetAccountID WHERE listID = :listID");
+		$setAccount->execute([':targetAccountID' => $targetAccountID, ':listID' => $listID]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListCreatorChange, $targetUserName, $targetUserID, $listID);
+		
+		return true;
+	}
+	
+	public static function renameList($listID, $person, $listName) {
+		require __DIR__."/connection.php";
+		
+		$list = self::getListByID($listID);
+		
+		$renameList = $db->prepare("UPDATE lists SET listName = :listName WHERE listID = :listID");
+		$renameList->execute([':listID' => $listID, ':listName' => $listName]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListRename, $listName, $list['listName'], $listID);
+		
+		return true;
+	}
+	
+	public static function changeListDescription($listID, $person, $description) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/exploitPatch.php";
+		
+		$accountID = $person['accountID'];
+		
+		$list = self::getListByID($listID);
+		
+		$description = Escape::url_base64_encode($description);
+		
+		$changeLevelDescription = $db->prepare("UPDATE lists SET listDesc = :listDesc WHERE listID = :listID");
+		$changeLevelDescription->execute([':listID' => $listID, ':listDesc' => $description]);
+		
+		if($list['accountID'] == $accountID) self::logAction($person, Action::ListChange, $list['listName'], $description, $listID);
+		else self::logModeratorAction($person, ModeratorAction::ListDescriptionChange, $description, $list['listDesc'], $listID);
+		
+		return true;
+	}
+	
+	public static function lockCommentingOnList($listID, $person, $lockCommenting) {
+		require __DIR__."/connection.php";
+
+		$lockLevel = $db->prepare("UPDATE lists SET commentLocked = :commentLocked WHERE listID = :listID");
+		$lockLevel->execute([':commentLocked' => $lockCommenting, ':listID' => $listID]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListLockCommenting, $lockCommenting, '', $listID);
+		
+		return true;
+	}
+	
+	public static function sendList($listID, $person, $reward, $difficulty, $featured, $levelsCount) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		
+		$realDifficulty = self::getListDifficulty($difficulty);
+		
+		$isSent = self::isListSent($listID, $accountID);
+		if($isSent) return false;
+		
+		$sendLevel = $db->prepare("INSERT INTO suggest (suggestBy, suggestLevelId, suggestDifficulty, suggestStars, suggestFeatured, timestamp)
+			VALUES (:accountID, :listID, :starDifficulty, :starStars, :starFeatured, :timestamp)");
+		$sendLevel->execute([':accountID' => $accountID, ':listID' => ($listID * -1), ':starDifficulty' => $realDifficulty['difficulty'], ':starStars' => $reward, ':starFeatured' => $featured, ':timestamp' => time()]);
+		
+		self::logModeratorAction($person, ModeratorAction::ListSuggest, $reward, $realDifficulty['difficulty'], $listID, $featured, $levelsCount);
+		
+		return $realDifficulty['name'];
+	}
+	
+	public static function isListSent($listID, $accountID) {
+		require __DIR__."/connection.php";
+		
+		$isSent = $db->prepare("SELECT count(*) FROM suggest WHERE suggestLevelId = :listID AND suggestBy = :accountID");
+		$isSent->execute([':listID' => ($listID * -1), ':accountID' => $accountID]);
+		$isSent = $isSent->fetchColumn();
+		
+		return $isSent > 0;
 	}
 	
 	/*
@@ -2318,7 +2612,7 @@ class Library {
 		
 		if(!$song || empty($song['ID']) || $song["isDisabled"] == 1) return false;
 		
-		$downloadLink = urlencode($song["download"]);
+		$downloadLink = urlencode(urldecode($song["download"]));
 		
 		if($librarySong) {
 			$artistsNames = [];
@@ -2841,8 +3135,30 @@ class Library {
 		return ["songs" => $favouriteSongs, "count" => $favouriteSongsCount];
 	}
 	
+	public static function saveNewgroundsSong($songID) {
+		require __DIR__."/connection.php";
+		
+		$url = 'http://www.boomlings.com/database/getGJSongInfo.php';
+		$data = ['songID' => $songID, 'secret' => 'Wmfd2893gb7'];
+		$headers = ['Content-type: application/x-www-form-urlencoded'];
+		
+		$request = self::sendRequest($url, $data, $headers, "POST", false);
+		if(!$request || is_numeric($request)) return false;
+		
+		// Will replace with function later
+		$resultarray = explode('~|~', $request);
+		$uploadDate = time();
+		$query = $db->prepare("INSERT INTO songs (ID, name, authorID, authorName, size, download)
+		VALUES (:id, :name, :authorID, :authorName, :size, :download)");
+		$query->execute([':id' => $songID, ':name' => $resultarray[3], ':authorID' => $resultarray[5], ':authorName' => $resultarray[7], ':size' => $resultarray[9], ':download' => $resultarray[13]]);
+		
+		unset($GLOBALS['core_cache']['songs'][$songID]);
+		
+		return self::getSongByID($songID);
+	}
+	
 	/*
-		Utils
+		Utils-related functions
 	*/
 	
 	public static function logAction($person, $type, $value1 = '', $value2 = '', $value3 = '', $value4 = '', $value5 = '', $value6 = '') {
@@ -2909,7 +3225,7 @@ class Library {
 					$isFuture = true;
 				}
 				
-				$tokens = array (31536000 => 'year', 2592000 => 'month', 604800 => 'week', 86400 => 'day', 3600 => 'hour', 60 => 'minute', 1 => 'second');
+				$tokens = [31536000 => 'year', 2592000 => 'month', 604800 => 'week', 86400 => 'day', 3600 => 'hour', 60 => 'minute', 1 => 'second'];
 				
 				foreach($tokens as $unit => $text) {
 					if($time < $unit) continue;
@@ -2991,20 +3307,6 @@ class Library {
 		
 		return ["ID" => $clanInfo["ID"], "clan" => $clanInfo["clan"], "tag" => $clanInfo["tag"], "desc" => $clanInfo["desc"], "clanOwner" => $clanInfo["clanOwner"], "color" => $clanInfo["color"], "isClosed" => $clanInfo["isClosed"], "creationDate" => $clanInfo["creationDate"]];
 	}
-
-	public static function getLatestSendsByLevelID($levelID) {
-		require_once __DIR__."/connection.php";
-
-		if(isset($GLOBALS['core_cache']['latestSends'][$levelID])) return $GLOBALS['core_cache']['latestSends'][$levelID];
-
-		$sendsInfo = $db->prepare("SELECT * FROM suggest WHERE suggestLevelId = :levelID ORDER BY timestamp DESC");
-		$sendsInfo->execute([":levelID" => $levelID]);
-		$sendsInfo = $query->fetchAll();
-
-		$GLOBALS['core_cache']['latestSends'][$levelID] = $sendsInfo;
-
-		return $sendsInfo;
-	}
 	
 	public static function makeClanUsername($accountID) {
 		require __DIR__."/../../config/dashboard.php";
@@ -3019,6 +3321,48 @@ class Library {
 		}
 		
 		return $user['userName'];
+	}
+	
+	public static function getPersonActions($person, $filters) {
+		require __DIR__."/connection.php";
+		
+		$accountID = $person['accountID'];
+		$IP = self::IPForBan($person['IP'], true);
+		
+		$getActions = $db->prepare("SELECT * FROM actions WHERE (account = :accountID OR IP REGEXP :IP) AND (".implode(") AND (", $filters).") ORDER BY timestamp DESC");
+		$getActions->execute([':accountID' => $accountID, ':IP' => $IP]);
+		$getActions = $getActions->fetchAll();
+		
+		return $getActions;
+	}
+	
+	public static function sendRequest($url, $data, $headers, $method, $includeUserAgent = false) {
+		require __DIR__."/../../config/proxy.php";
+		
+		$curl = curl_init($url);
+		
+		if($proxytype > 0) {
+			curl_setopt($curl, CURLOPT_PROXY, $host);
+			if(!empty($auth)) curl_setopt($curl, CURLOPT_PROXYUSERPWD, $auth); 
+			
+			if($proxytype == 2) curl_setopt($curl, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+		}
+		
+		if(!$includeUserAgent) curl_setopt($curl, CURLOPT_USERAGENT, "");
+		elseif(!$headers['User-Agent']) $headers['User-Agent'] = 'GMDprivateServer (https://github.com/MegaSa1nt/GMDprivateServer, 2.0)';
+		
+		curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
+		if($method != "GET") curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($data));
+		
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+		curl_setopt($curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+		curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+		
+		$result = curl_exec($curl);
+		curl_close($curl);
+		
+		return $result ?: false;
 	}
 	
 	/*
@@ -3046,44 +3390,6 @@ class Library {
 		$user['userName'] = self::makeClanUsername($user['extID']);
 		
 		return "1:".$user["userName"].":2:".$user["userID"].":9:".$user['icon'].":10:".$user["color1"].":11:".$user["color2"].":14:".$user["iconType"].":15:".$user["special"].":16:".$user["extID"].":32:".$user["ID"].":35:".$user["comment"].":41:".$user["isNew"].":37:".$user['uploadTime'];
-	}
-	public static function getGMDFile($levelID) {
-		require_once __DIR__."/connection.php";
-
-		$level = self::getLevelByID($levelID);
-		if(!$level) return false;
-		
-		$levelString = file_get_contents(__DIR__.'/../../data/levels/'.$levelID) ?? $level['levelString'];
-		$gmdFile = '<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict>';
-		
-		$gmdFile .= '<k>k1</k><i>'.$levelID.'</i>';
-		$gmdFile .= '<k>k2</k><s>'.$level['levelName'].'</s>';
-		$gmdFile .= '<k>k3</k><s>'.$level['levelDesc'].'</s>';
-		$gmdFile .= '<k>k4</k><s>'.$levelString.'</s>';
-		$gmdFile .= '<k>k5</k><s>'.$level['userName'].'</s>';
-		$gmdFile .= '<k>k6</k><i>'.$level['userID'].'</i>';
-		$gmdFile .= '<k>k8</k><i>'.$level['audioTrack'].'</i>';
-		$gmdFile .= '<k>k11</k><i>'.$level['downloads'].'</i>';
-		$gmdFile .= '<k>k13</k><t />';
-		$gmdFile .= '<k>k16</k><i>'.$level['levelVersion'].'</i>';
-		$gmdFile .= '<k>k21</k><i>2</i>';
-		$gmdFile .= '<k>k23</k><i>'.$level['levelLength'].'</i>';
-		$gmdFile .= '<k>k42</k><i>'.$level['levelID'].'</i>';
-		$gmdFile .= '<k>k45</k><i>'.$level['songID'].'</i>';
-		$gmdFile .= '<k>k47</k><t />';
-		$gmdFile .= '<k>k48</k><i>'.$level['objects'].'</i>';
-		$gmdFile .= '<k>k50</k><i>'.$level['binaryVersion'].'</i>';
-		$gmdFile .= '<k>k87</k><i>556365614873111</i>';
-		$gmdFile .= '<k>k101</k><i>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</i>';
-		$gmdFile .= '<k>kl1</k><i>0</i>';
-		$gmdFile .= '<k>kl2</k><i>0</i>';
-		$gmdFile .= '<k>kl3</k><i>1</i>';
-		$gmdFile .= '<k>kl5</k><i>1</i>';
-		$gmdFile .= '<k>kl6</k><k>kI6</k><d><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s><k>0</k><s>0</s></d>';
-		
-		$gmdFile .= '</dict></plist>';
-
-		return $gmdFile;
 	}
 }
 ?>

@@ -26,8 +26,10 @@ if($levelID > 0) {
 } else {
 	$listID = $levelID * -1;
 	$list = Library::getListByID($listID);
+	if(!$list) exit(CommonError::InvalidRequest);
 	
-	// Commands here
+	$command = Commands::processListCommand($comment, $list, $person);
+	if($command) exit(Library::showCommentsBanScreen($command, 0));
 }
 
 $ableToComment = Library::isAbleToComment($levelID, $person);

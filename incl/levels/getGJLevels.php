@@ -9,6 +9,7 @@ $sec = new Security();
 $person = $sec->loginPlayer();
 if(!$person["success"]) exit(CommonError::InvalidRequest);
 $accountID = $person["accountID"];
+$userID = $person["userID"];
 
 $time = time();
 $echoString = $userString = $songsString = $queryJoin = '';
@@ -153,7 +154,7 @@ switch($type) {
 		$order = "likes";
 		break;
 	case 5: // Levels per user
-		if(Library::getUserID($accountID) == $str) $filters = [];
+		if($userID == $str) $filters = [];
 		$filters[] = "levels.userID = '".$str."'";
 		break;
 	case 6: // Featured
@@ -196,12 +197,12 @@ switch($type) {
 		break;
 	case 12: // Followed
 		$followed = Escape::multiple_ids($_POST["followed"]);
-		$filters[] = "extID IN (".$followed.")";
+		$filters[] = $followed ? "extID IN (".$followed.")" : "1 != 1";
 		break;
 	case 13: // Friends
 		$friendsArray = Library::getFriends($accountID);
 		$friendsString = implode(",", $friendsArray);
-		$filters[] = "extID IN (".$friendsString.")";
+		$filters[] = $friendsString ? "extID IN (".$friendsString.")" : "1 != 1";
 		break;
 	case 21: // Daily safe
 		$queryJoin = "INNER JOIN dailyfeatures ON levels.levelID = dailyfeatures.levelID";

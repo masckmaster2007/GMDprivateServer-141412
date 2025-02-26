@@ -25,9 +25,9 @@ switch(true) {
 		
 		exit(CommonError::Success);
 	case $demonDifficultiesVotes:
-		if(!$level['starStars']) exit(CommonError::InvalidRequest);
+		if($level['starStars'] != 10) exit(CommonError::InvalidRequest);
 		
-		Library::voteForLevelDifficulty($levelID, $ratingNumber);
+		Library::voteForLevelDifficulty($levelID, $person, $ratingNumber);
 		
 		exit(CommonError::Success);
 }
