@@ -1,10 +1,5 @@
-# GMDprivateServer
-## Geometry Dash Private Server Emulator
-
-![Geometry Dash](https://img.shields.io/badge/Geometry%20Dash-Server%20Emulator-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-
-A server emulator for Geometry Dash.
+## GMDprivateServer
+### A server emulator for Geometry Dash.
 
 ## Prerequisites
 
@@ -37,7 +32,7 @@ A server emulator for Geometry Dash.
 1. Backup your existing installation
 2. Upload new files to your web server
 3. Set `$installed` to `false` in `config/dashboard.php`
-4. Run the update process through the dashboard
+4. Server will install missing SQL data in next request to GDPS
 
 ## Credits
 
@@ -45,4 +40,4 @@ A server emulator for Geometry Dash.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./license.md) file for details.
+This project is licensed under the GPL 3.0 License - see the [LICENSE](./license.md) file for details.
