@@ -41,7 +41,7 @@ A server emulator for Geometry Dash.
 
 ## Credits
 
-- generateHash.php functionality: pavlukivan, Italian APK Downloader
+- Hash functions in incl/lib/security.php: pavlukivan, Italian APK Downloader
 
 ## License
 
