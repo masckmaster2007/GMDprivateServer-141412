@@ -1,17 +1,48 @@
-## GMDprivateServer
-### Geometry Dash Server Emulator
+# GMDprivateServer
+## Geometry Dash Private Server Emulator
 
-### Setup
+![Geometry Dash](https://img.shields.io/badge/Geometry%20Dash-Server%20Emulator-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-Initial:
-1. Upload files to webserver
-2. Configure `config/connection.php` to match your MySQL settings
-3. Import `database.sql` file to your database
-4. Edit links in GD's `.exe` and `.so` files
+A server emulator for Geometry Dash.
 
-Updating:
-1. Upload files to webserver
-2. Set `$installed` to false in config/dashboard.php
+## Prerequisites
 
-### Credits:
-Most of the stuff in generateHash.php has been figured out by pavlukivan and Italian APK Downloader, so credits to them
+- Web server (Apache/Nginx recommended) or Docker (for containerized deployment)
+- PHP 7.0 or higher
+- MySQL/MariaDB database
+
+## Installation
+
+### Initial Setup
+
+1. Clone this repository or download the latest release
+2. Upload all files to your web server
+3. Configure database connection in `config/connection.php`:
+   ```php
+   $servername = "localhost";
+   $port = 3306;
+   $username = "root";
+   $password = "123123";
+   $dbname = "gcs";
+   ```
+4. Import the `database.sql` file to your MySQL database
+5. Modify the Geometry Dash client:
+   - Edit links in GD's `.exe` file (Windows)
+   - Edit links in GD's `.so` file (Android)
+   - Point them to your server's URL
+
+### Updating
+
+1. Backup your existing installation
+2. Upload new files to your web server
+3. Set `$installed` to `false` in `config/dashboard.php`
+4. Run the update process through the dashboard
+
+## Credits
+
+- generateHash.php functionality: pavlukivan, Italian APK Downloader
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](./license.md) file for details.
