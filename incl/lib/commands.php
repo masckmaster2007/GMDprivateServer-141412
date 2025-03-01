@@ -201,6 +201,15 @@ class Commands {
 				if(!$sendLevel) return "You already suggested ".$level['levelName']."!";
 				
 				return "You successfully sent ".$level['levelName'].' as '.$sendLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
+			case '!unsuggest':
+			case '!unsend':
+			case '!unsug':
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+				
+				$unsendLevel = Library::unsendLevel($levelID, $person);
+				if(!$unsendLevel) return "You haven't suggested ".$level['levelName'].'!';
+				
+				return "You successfully unsent ".$level['levelName'].'!';
 			case '!setacc':
 			case '!account':
 			case '!move':

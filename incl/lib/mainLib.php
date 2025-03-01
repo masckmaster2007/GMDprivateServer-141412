@@ -1798,6 +1798,22 @@ class Library {
 		return $realDifficulty['name'];
 	}
 	
+	public static function unsendLevel($levelID, $person) {
+		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
+		$isSent = self::isLevelSent($levelID, $person['accountID']);
+		if(!$isSent) return false;
+		
+		$unsendLevel = $db->prepare("DELETE FROM suggest WHERE suggestLevelId = :levelID AND suggestBy = :accountID");
+		$unsendLevel->execute([':levelID' => $levelID, ':accountID' => $person['accountID']]);
+		
+		self::logModeratorAction($person, ModeratorAction::LevelSuggestRemove, $levelID);
+
+		return true;
+	}
+	
 	public static function isLevelSent($levelID, $accountID) {
 		require __DIR__."/connection.php";
 		
