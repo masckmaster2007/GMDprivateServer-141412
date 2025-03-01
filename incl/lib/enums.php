@@ -97,10 +97,11 @@ class Action {
 	const ListChange = 18;
 	const ListDeletion = 19;
 	
-	// To be done with profile commands
-	const DiscordAccountLink = 24;
-	const DiscordAccountUnlink = 25;
-	const DiscordAccountLinkStart = 26;
+	const DiscordLink = 24;
+	const DiscordUnlink = 25;
+	const DiscordLinkStart = 26;
+	const FailedDiscordLinkStart = 47;
+	const FailedDiscordLink = 48;
 	
 	const FriendRequestAccept = 28;
 	const FriendRequestDeny = 30;

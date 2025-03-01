@@ -93,6 +93,20 @@ class Library {
 		return $account;
 	}
 	
+	public static function getAccountByDiscord($discordID) {
+		require __DIR__."/connection.php";
+		
+		if(isset($GLOBALS['core_cache']['accounts']['discord'][$discordID])) return $GLOBALS['core_cache']['accounts']['discord'][$discordID];
+		
+		$account = $db->prepare("SELECT * FROM accounts WHERE discordID = :discordID AND discordLinkReq = 0");
+		$account->execute([':discordID' => $discordID]);
+		$account = $account->fetch();
+		
+		$GLOBALS['core_cache']['accounts']['discord'][$discordID] = $account;
+		
+		return $account;
+	}
+	
 	public static function createUser($userName, $accountID, $IP) {
 		require __DIR__."/connection.php";
 		
@@ -3138,11 +3152,10 @@ class Library {
 	public static function saveNewgroundsSong($songID) {
 		require __DIR__."/connection.php";
 		
-		$url = 'http://www.boomlings.com/database/getGJSongInfo.php';
 		$data = ['songID' => $songID, 'secret' => 'Wmfd2893gb7'];
 		$headers = ['Content-type: application/x-www-form-urlencoded'];
 		
-		$request = self::sendRequest($url, $data, $headers, "POST", false);
+		$request = self::sendRequest('http://www.boomlings.com/database/getGJSongInfo.php', http_build_query($data), $headers, "POST", false);
 		if(!$request || is_numeric($request)) return false;
 		
 		// Will replace with function later
@@ -3349,10 +3362,10 @@ class Library {
 		}
 		
 		if(!$includeUserAgent) curl_setopt($curl, CURLOPT_USERAGENT, "");
-		elseif(!$headers['User-Agent']) $headers['User-Agent'] = 'GMDprivateServer (https://github.com/MegaSa1nt/GMDprivateServer, 2.0)';
+		else $headers[] = 'User-Agent: GMDprivateServer (https://github.com/MegaSa1nt/GMDprivateServer, 2.0)';
 		
 		curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
-		if($method != "GET") curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($data));
+		if($method != "GET") curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
 		
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
@@ -3362,7 +3375,7 @@ class Library {
 		$result = curl_exec($curl);
 		curl_close($curl);
 		
-		return $result ?: false;
+		return $result;
 	}
 	
 	/*

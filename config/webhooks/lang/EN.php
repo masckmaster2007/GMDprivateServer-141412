@@ -42,15 +42,14 @@ $webhookLang['suggestDesc'] = '%1$s suggested a level to rate!';
 $webhookLang['footerSuggest'] = '%1$s, thank you for moderating!';
 
 $webhookLang['accountLinkTitle'] = ['Account linking!', 'Someone wants to link account!'];
-$webhookLang['accountLinkDesc'] = 'It seems like %1$s wants to link their in-game account to your Discord account. Post **!discord accept *code*** in your in-game profile to do it. If that\'s not you - **ignore** this message!';
-$webhookLang['accountCodeFirst'] = 'First number';
-$webhookLang['accountCodeSecond'] = 'Second number';
-$webhookLang['accountCodeThird'] = 'Third number';
-$webhookLang['accountCodeFourth'] = 'Fourth number';
+$webhookLang['accountLinkDesc'] = 'It seems like **%1$s** wants to link their in-game account to your Discord account.'.PHP_EOL
+	.'Post **!discord accept *code*** in your in-game profile to do it.'.PHP_EOL
+	.'If that\'s not you, ignore this message.'.PHP_EOL.PHP_EOL
+	.'## ||%2$s||';
 $webhookLang['accountUnlinkTitle'] = ['Account unlinking!', 'You unlinked your account!'];
-$webhookLang['accountUnlinkDesc'] = 'You successfully unlinked %1$s from your Discord account!';
+$webhookLang['accountUnlinkDesc'] = 'You successfully unlinked **%1$s** from your Discord account!';
 $webhookLang['accountAcceptTitle'] = ['Account linking!', 'You linked your account!'];
-$webhookLang['accountAcceptDesc'] = 'You successfully linked %1$s to your Discord account!';
+$webhookLang['accountAcceptDesc'] = 'You successfully linked **%1$s** to your Discord account!';
 
 $webhookLang['playerBanTitle'] = ['Player was banned!', 'Someone banned someone!', 'Ban!'];
 $webhookLang['playerBanTitleDM'] = ['You were banned!', 'Someone banned you!', 'Ban!'];

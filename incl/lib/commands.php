@@ -549,5 +549,73 @@ class Commands {
 		
 		return "Command ".$command." was not found.";
 	}
+	
+	public static function processProfileCommand($comment, $account, $person) {
+		require __DIR__.'/../../config/discord.php';
+		require_once __DIR__.'/mainLib.php';
+		require_once __DIR__.'/discord.php';
+		require_once __DIR__.'/exploitPatch.php';
+		
+		if(substr($comment, 0, 1) != '!') return false;
+		
+		$accountID = $person['accountID'];
+		
+		$commentSplit = explode(' ', $comment);
+		$command = $commentSplit[0];
+		$subCommand = $commentSplit[1];
+		
+		if($command != '!discord') return "Command ".$command." was not found.";
+		if(!$subCommand) return "Please specify subcommand to ".$command.".";
+		
+		if(!$discordEnabled) return "Linking account to Discord is disabled!";
+		
+		switch($subCommand) {
+			case 'link':
+			case 'l':
+				$discordID = Escape::number($commentSplit[2]);
+				if(!$discordID) {
+					return "Incorrect usage!".PHP_EOL
+						."!discord link *Discord account ID*".PHP_EOL
+						."Example: !discord link 297295491417505793";
+				}
+				
+				$link = Discord::getUserDiscord($accountID);
+				if($link) return "You already linked your account with Discord ID ".$link."!";
+				
+				$discordAccount = Library::getAccountByDiscord($discordID);
+				if($discordAccount) return "Discord ID ".$discordID." is already linked with account ".$discordAccount['userName']."!";
+				
+				$startLinking = Discord::startLinkingAccount($person, $discordID);
+				if(!$startLinking) return "Something went wrong when trying to send code to Discord DMs or Discord ID ".$discordID." doesn't exist.";
+				
+				return "Verification code and next steps were sent to ".$startLinking." (".$discordID.")!";
+			case 'accept':
+			case 'verify':
+			case 'a':
+			case 'v':
+				$code = Escape::number($commentSplit[2]);
+				if(!$code) {
+					return "Incorrect usage!".PHP_EOL
+						."!discord accept *Verification code*".PHP_EOL
+						."Example: !discord accept 7024";
+				}
+				
+				$link = Discord::getUserDiscord($accountID);
+				if($link) return "You already linked your account with Discord ID ".$link."!";
+				
+				$verifyLinking = Discord::verifyDiscordLinking($person, $code);
+				if(!$verifyLinking) return "You didn't start linking your Discord account or code is wrong.";
+				
+				return "You successfully linked your account to Discord ID ".$verifyLinking."!";
+			case 'unlink':
+			case 'u':
+				$unlink = Discord::unlinkDiscordAccount($person);
+				if(!$unlink) return "Your account doesn't have connection with Discord!";
+				
+				return "You successfully unlinked your account from Discord!";
+		}
+		
+		return "Command ".$command." ".$subCommand." was not found.";
+	}
 }
 ?>

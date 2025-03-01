@@ -217,4 +217,14 @@ $demonDifficultiesVotes = true;
 	Example: u16, a71
 */
 $enableUserLevelsSearching = true;
+
+/*
+	Show top artists from real Geometry Dash
+	
+	GDPS core has favourite songs feature, but if you dont want to show them in-game, you can turn on this config
+	
+	True — real Geometry Dash will show instead of showing player's favourite songs
+	False — favourite songs will show in top artists page
+*/
+$topArtistsFromGD = false;
 ?>
