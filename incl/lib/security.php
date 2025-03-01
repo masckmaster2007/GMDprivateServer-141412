@@ -43,6 +43,9 @@ class Security {
 		
 		self::updateLastPlayed($userID);
 		
+		$udid = isset($_POST['udid']) ? Escape::text($_POST['udid']) : '';
+		if($udid) self::assignUDIDToRegisteredAccount($userID, $udid, $userName);
+		
 		return ["success" => true, "accountID" => (string)$accountID, "userID" => (string)$userID, "userName" => (string)$userName, "IP" => $IP];
 	}
 	
@@ -95,13 +98,17 @@ class Security {
 	}
 	
 	public static function getLoginType() {
+		require_once __DIR__."/exploitPatch.php";
+		require_once __DIR__."/XOR.php";
+		
 		switch(true) {
 			case isset($_POST['gjp2']):
 				$key = $_POST['gjp2'];
 				$type = 2;
 				break;
 			case isset($_POST['password']):
-				$key = $_POST['password'];
+			case isset($_POST['gjp']):
+				$key = !isset($_POST['gjp']) ? $_POST['password'] : XORCipher::cipher(Escape::url_base64_decode($_POST['gjp']), 37526);
 				$type = 1;
 				break;
 			case isset($_POST['auth']):
@@ -115,18 +122,35 @@ class Security {
 	}
 	
 	public function loginPlayer() {
+		require __DIR__."/../../config/security.php";
 		require_once __DIR__."/mainLib.php";
 		require_once __DIR__."/exploitPatch.php";
 		require_once __DIR__."/enums.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
 		
 		switch(true) {
+			case !empty($_POST['uuid']) && (!empty($_POST['password']) || !empty($_POST['gjp']) || !empty($_POST['gjp2']) || !empty($_POST['auth'])):
+				$userID = Escape::number($_POST['uuid']);
+				$accountID = Library::getAccountID($userID);
+				break;
+			case empty($_POST['password']) && empty($_POST['gjp']) && empty($_POST['gjp2']) && empty($_POST['auth']) && $unregisteredSubmissions:
+				$udid = isset($_POST['udid']) ? Escape::text($_POST['udid']) : '';
+				$userID = isset($_POST['uuid']) ? Escape::number($_POST['uuid']) : 0;
+				$userName = isset($_POST['userName']) ? Escape::latin($_POST['userName']) : "Undefined";
+				$accountID = isset($_POST['accountID']) ? Escape::number($_POST['accountID']) : 0;
+				
+				if(!$userID && !empty($accountID)) $userID = Library::getUserID($accountID);
+				
+				$verifyUDID = self::verifyUDID($userID, $udid, $userName);
+				if(!$verifyUDID) return ["success" => true, "accountID" => "0", "userID" => "0", "userName" => "Undefined", "IP" => $IP];
+				
+				return ["success" => true, "accountID" => (!$accountID ? (string)$verifyUDID['unregisteredID'] : $accountID), "userID" => (string)$verifyUDID['userID'], "userName" => (string)$verifyUDID["userName"], "IP" => $IP];
+				break;
 			case !empty($_POST['userName']):
 				$userName = Escape::latin($_POST['userName']);
 				$accountID = Library::getAccountIDWithUserName($userName);
-				break;
-			case !empty($_POST['uuid']):
-				$userID = Escape::number($_POST['uuid']);
-				$accountID = Library::getAccountID($userID);
 				break;
 			default:
 				$accountID = Escape::number($_POST['accountID']);
@@ -142,10 +166,8 @@ class Security {
 	}
 	
 	public static function updateLastPlayed($userID) {
-		require_once __DIR__."/connection.php";
+		require __DIR__."/connection.php";
 
-		if(!isset($db)) global $db;
-		
 		$updateLastPlayed = $db->prepare("UPDATE users SET lastPlayed = :lastPlayed WHERE userID = :userID");
 		return $updateLastPlayed->execute([':lastPlayed' => time(), ':userID' => $userID]);
 	}
@@ -168,7 +190,7 @@ class Security {
 		$m = intdiv($len, 40);
 		$i = 40;
 		
-		while($i)$hash[--$i] = $levelString[$i*$m];
+		while($i) $hash[--$i] = $levelString[$i * $m];
 		
 		return sha1($hash);
 	}
@@ -181,8 +203,90 @@ class Security {
 		return sha1($levelString."oC36fpYaPtdg");
 	}
 	
-	public static function generateFourthHash($levelString){
+	public static function generateFourthHash($levelString) {
 		return sha1($levelString."pC26fpYaQCtg");
+	}
+	
+	public static function verifyUDID($userID, $udid, $userName) {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/mainLib.php";
+		
+		if(!$udid) return false;
+		
+		$hashedUDID = sha1($udid."PUH7d3v6hDjAa2bfuM9r");
+		
+		$unregistered = $db->prepare("SELECT * FROM udids WHERE userID = :userID OR udids REGEXP :udid");
+		$unregistered->execute([':userID' => $userID, ':udid' => $hashedUDID]);
+		$unregistered = $unregistered->fetch();
+		
+		if(!$unregistered) {
+			$unregistered = self::hashUDID($userID, $udid, $userName);
+			
+			return ['unregisteredID' => "u".$unregistered['unregisteredID'], 'userID' => $unregistered['userID'], 'userName' => $userName];
+		} else {
+			$udidVerified = false;
+			$udidsArray = explode(",", $unregistered['udids']);
+			
+			foreach($udidsArray AS &$udid) {
+				if($udid == $hashedUDID) {
+					$udidVerified = true;
+					break;
+				}
+			}
+			
+			if(!$udidVerified) return false;
+			
+			return ['unregisteredID' => "u".$unregistered['ID'], 'userID' => $unregistered['userID'], 'userName' => $userName];
+		}
+	}
+	
+	public static function hashUDID($userID, $udid, $userName = "Undefined") {
+		require __DIR__."/connection.php";
+		require_once __DIR__."/ip.php";
+		
+		$IP = IP::getIP();
+		$hashedUDID = sha1($udid."PUH7d3v6hDjAa2bfuM9r");
+		
+		$registerUDID = $db->prepare("INSERT INTO udids (userID, udids)
+			VALUES (:userID, :udid)");
+		$registerUDID->execute([':userID' => $userID, ':udid' => $hashedUDID]);
+		$unregisteredID = $db->lastInsertId();
+		
+		if($userID == 0) {
+			$userID = Library::createUser($userName, "u".$unregisteredID, $IP);
+		
+			$registerUDID = $db->prepare("UPDATE udids SET userID = :userID WHERE ID = :unregisteredID");
+			$registerUDID->execute([':userID' => $userID, ':unregisteredID' => $unregisteredID]);
+		} else {
+			$updateUser = $db->prepare("UPDATE users SET extID = :unregisteredID WHERE userID = :userID AND isRegistered = 0");
+			$updateUser->execute([':userID' => $userID, ':unregisteredID' => "u".$unregisteredID]);
+		}
+		
+		return ['unregisteredID' => $unregisteredID, 'userID' => $userID];
+	}
+	
+	public static function assignUDIDToRegisteredAccount($userID, $udid, $userName) {
+		require __DIR__."/connection.php";
+		
+		$unregistered = $db->prepare("SELECT * FROM udids WHERE userID = :userID");
+		$unregistered->execute([':userID' => $userID]);
+		$unregistered = $unregistered->fetch();
+		if(!$unregistered) return self::hashUDID($userID, $udid, $userName);
+		
+		$hashedUDID = sha1($udid."PUH7d3v6hDjAa2bfuM9r");
+		
+		$udidsArray = explode(",", $unregistered['udids']);
+		
+		foreach($udidsArray AS &$assignedUDID) if($assignedUDID == $hashedUDID) return true;
+		
+		$udidsArray[] = $hashedUDID;
+		
+		$udids = implode(",", $udidsArray);
+		
+		$updateUnregistered = $db->prepare("UPDATE udids SET udids = :udids WHERE userID = :userID");
+		$updateUnregistered->execute([':udids' => $udids, ':userID' => $userID]);
+		
+		return true;
 	}
 }
 ?>

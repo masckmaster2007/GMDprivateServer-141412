@@ -227,4 +227,14 @@ $enableUserLevelsSearching = true;
 	False — favourite songs will show in top artists page
 */
 $topArtistsFromGD = false;
+
+/*
+	Disallow rating your own levels
+	
+	Moderators with rate permissions can rate any levels, but what if you need to disallow them rating their own levels?
+	
+	True — moderators are not allowed to rate their own levels
+	False — moderators can rate their own levels
+*/
+$dontRateYourOwnLevels = false;
 ?>

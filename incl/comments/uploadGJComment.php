@@ -17,6 +17,7 @@ $percent = Escape::number($_POST['percent']) ?: 0;
 if(empty($comment)) exit(CommonError::InvalidRequest);
 
 if($gameVersion >= 20) $comment = Escape::url_base64_decode($comment);
+
 if($levelID > 0) {
 	$level = Library::getLevelByID($levelID);
 	if(!$level) exit(CommonError::InvalidRequest);

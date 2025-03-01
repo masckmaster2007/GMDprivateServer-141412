@@ -1,6 +1,7 @@
 <?php
 class Commands {
 	public static function processLevelCommand($comment, $level, $person) {
+		require __DIR__.'/../../config/misc.php';
 		require_once __DIR__.'/mainLib.php';
 		require_once __DIR__.'/exploitPatch.php';
 		
@@ -34,12 +35,16 @@ class Commands {
 
 				if(!$stars) return "Please use !unrate to unrate level.";
 				
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't rate your own level.";
+				
 				$rateLevel = Library::rateLevel($levelID, $person, $difficulty, $stars, $verifyCoins, $featured);
 				
 				return "You successfully rated ".$level['levelName'].' as '.$rateLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
 			case '!unrate':
 			case '!unr':
 				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't unrate your own level.";
 				
 				Library::rateLevel($levelID, $person, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), 0, 0, 0);
 				
@@ -62,7 +67,6 @@ class Commands {
 			case '!unepi':
 			case '!unleg':
 			case '!unmyt':
-			
 				$commandArray = [
 					'!feature' => 1, '!fea' => 1, '!f' => 1,
 					'!epic' => 2, '!epi' => 2,
@@ -79,6 +83,8 @@ class Commands {
 				$featurePermission = $featured < 2 && $level['starEpic'] == 0 ? 'Feature' : 'Epic';
 				if(!Library::checkPermission($person, 'command'.$featurePermission)) return "You don't have permissions to use command ".$command."!";
 				
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't ".(!$featured ? 'un' : '')."feature your own level.";
+				
 				Library::rateLevel($levelID, $person, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), $level['starStars'], $level['starCoins'], $featured);
 				
 				return "You successfully ".sprintf($returnTextArray[$featured], $level['levelName']);
@@ -87,14 +93,16 @@ class Commands {
 			case '!vc':
 			case '!unvc':
 				if(!Library::checkPermission($person, 'commandVerifycoins')) return "You don't have permissions to use command ".$command."!";
-			
+				
 				$commandArray = [
 					'!verifycoins' => 1, '!vc' => 1,
 					'!unverifycoins' => 0, '!unvc' => 0
 				];
-				
+			
 				$returnTextArray = ['unverified coins in %1$s!', 'verified coins in %1$s!'];
 				$verifyCoins = $commandArray[$command];
+				
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't ".(!$verifyCoins ? 'un' : '')."verify coins on your own level.";
 				
 				$featured = $level['starEpic'] + ($level['starFeatured'] ? 1 : 0);
 				
@@ -186,6 +194,8 @@ class Commands {
 						."!send *difficulty* *stars* *featured/epic/legendary/mythic*".PHP_EOL
 						."Example: !send harder 7 4";
 				}
+				
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't suggest your own level.";
 				
 				$sendLevel = Library::sendLevel($levelID, $person, $difficulty, $stars, $featured);
 				if(!$sendLevel) return "You already suggested ".$level['levelName']."!";
@@ -360,6 +370,7 @@ class Commands {
 	}
 	
 	public static function processListCommand($comment, $list, $person) {
+		require __DIR__.'/../../config/misc.php';
 		require_once __DIR__.'/mainLib.php';
 		require_once __DIR__.'/exploitPatch.php';
 		
@@ -395,12 +406,16 @@ class Commands {
 
 				if(!$reward) return "Please use !unrate to unrate list.";
 				
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't rate your own list.";
+				
 				$rateList = Library::rateList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
 				
 				return "You successfully rated ".$list['listName'].' as '.$rateList.', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
 			case '!unrate':
 			case '!unr':
 				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't unrate your own list.";
 				
 				Library::rateList($listID, $person, 0, $list['starDifficulty'], 0, 0);
 				
@@ -418,6 +433,8 @@ class Commands {
 					'!unfeature' => 0, '!unfea' => 0, '!unf' => 0,
 				];
 				$featuredValue = $commandArray[$command];
+				
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't ".(!$featuredValue ? 'un' : '')."feature your own list.";
 				
 				Library::rateList($listID, $person, $list['starStars'], $list['starDifficulty'], $featuredValue, $list['countForReward']);
 				
@@ -540,6 +557,8 @@ class Commands {
 						."!send *reward amount* *difficulty* *is featured* *required levels amount to complete list*".PHP_EOL
 						."Example: !send 50 harder 1 7";
 				}
+				
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't suggest your own list.";
 				
 				$sendList = Library::sendList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
 				if(!$sendList) return "You already suggested ".$list['listName']."!";

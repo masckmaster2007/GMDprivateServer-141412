@@ -114,7 +114,7 @@ switch($type) {
 			if(is_numeric($str)) {
 				$friendsArray = Library::getFriends($accountID);
 				$friendsArray[] = $accountID;
-				$friendsString = implode(",", $friendsArray);
+				$friendsString = "'".implode("','", $friendsArray)."'";
 				$filters = ["levelID = ".$str." AND (
 					unlisted != 1 OR
 					(unlisted = 1 AND (extID IN (".$friendsString.")))
@@ -184,7 +184,7 @@ switch($type) {
 		
 		$friendsArray = Library::getFriends($accountID);
 		$friendsArray[] = $accountID;
-		$friendsString = implode(",", $friendsArray);
+		$friendsString = "'".implode("','", $friendsArray)."'";
 		
 		$filters[] = "levelID IN (".$str.") AND (
 				unlisted != 1 OR
@@ -201,7 +201,7 @@ switch($type) {
 		break;
 	case 13: // Friends
 		$friendsArray = Library::getFriends($accountID);
-		$friendsString = implode(",", $friendsArray);
+		$friendsString = "'".implode("','", $friendsArray)."'";
 		$filters[] = $friendsString ? "extID IN (".$friendsString.")" : "1 != 1";
 		break;
 	case 21: // Daily safe
@@ -223,7 +223,7 @@ switch($type) {
 		$listLevels = Library::getListLevels($str);
 		$friendsArray = Library::getFriends($accountID);
 		$friendsArray[] = $accountID;
-		$friendsString = implode(",", $friendsArray);
+		$friendsString = "'".implode("','", $friendsArray)."'";
 		
 		$filters = ["levelID IN (".$listLevels.") AND (
 				unlisted != 1 OR

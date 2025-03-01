@@ -54,7 +54,7 @@ switch($type) {
 			if(is_numeric($str)) {
 				$friendsArray = Library::getFriends($accountID);
 				$friendsArray[] = $accountID;
-				$friendsString = implode(",", $friendsArray);
+				$friendsString = "'".implode("','", $friendsArray)"'";
 				$filters = ["listID = ".$str." AND (
 					unlisted <> 1 OR
 					(unlisted = 1 AND (accountID IN (".$friendsString.")))
@@ -105,7 +105,7 @@ switch($type) {
 		break;
 	case 13: // Friends
 		$friendsArray = Library::getFriends($accountID);
-		$friendsString = implode(",", $friendsArray);
+		$friendsString = "'".implode("','", $friendsArray)"'";
 		$filters[] = $friendsString ? "lists.accountID IN (".$friendsString.")" : "1 != 1";
 		break;
 	case 27: // Sent

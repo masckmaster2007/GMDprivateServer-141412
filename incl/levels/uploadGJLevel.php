@@ -36,7 +36,7 @@ switch(true) {
 		$unlisted = Escape::number($_POST['unlisted1']);
 		break;
 	default:
-		$unlisted = Escape::number($_POST['unlisted']);
+		$unlisted = Escape::number($_POST['unlisted']) ?: 0;
 		break;
 }
 $isLDM = !empty($_POST["ldm"]) ? Escape::number($_POST["ldm"]) : 0;

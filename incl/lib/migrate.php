@@ -3,6 +3,7 @@ if(!isset($db)) global $db;
 
 require __DIR__."/../../config/dashboard.php";
 require_once __DIR__."/mainLib.php";
+require_once __DIR__."/security.php";
 
 if(!$installed) {
 	$check = $db->query("SHOW TABLES LIKE 'replies'");
@@ -125,6 +126,21 @@ if(!$installed) {
 			 `timestamp` int(11) NOT NULL DEFAULT 0,
 			 PRIMARY KEY (`rewardID`)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+	$check = $db->query("SHOW TABLES LIKE 'udids'");
+		$exist = $check->fetchAll();
+		if(empty($exist)) {
+			$db->query("CREATE TABLE `udids` (
+					`ID` int(11) NOT NULL AUTO_INCREMENT,
+					`userID` int(11) NOT NULL DEFAULT 0,
+					`udids` varchar(1024) NOT NULL DEFAULT '' COLLATE 'utf8mb4_general_ci',
+					PRIMARY KEY (`ID`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+			$extIDs = $db->prepare("SELECT userID, extID FROM users WHERE extID NOT REGEXP '^[0-9]+$' AND extID != ''");
+			$extIDs->execute();
+			$extIDs = $extIDs->fetchAll();
+			
+			foreach($extIDs AS &$udid) Security::hashUDID($udid['userID'], $udid['extID']);
+		}
 	$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'dashboardLevelPackCreate'");
     	$exist = $check->fetchAll();
     	if(empty($exist)) $db->query("ALTER TABLE roles ADD dashboardLevelPackCreate INT NOT NULL DEFAULT '0' AFTER dashboardModTools");

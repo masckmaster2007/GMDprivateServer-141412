@@ -270,8 +270,12 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$userID = $person['userID'];
 		$userName = $person['userName'];
+		
+		if($enableCommentLengthLimiter) $comment = mb_substr($comment, 0, $maxAccountCommentLength);
 		
 		$comment = Escape::url_base64_encode($comment);
 		
@@ -288,12 +292,16 @@ class Library {
 	public static function updateAccountSettings($person, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$updateAccountSettings = $db->prepare("UPDATE accounts SET mS = :messagesState, frS = :friendRequestsState, cS = :commentsState, youtubeurl = :socialsYouTube, twitter = :socialsTwitter, twitch = :socialsTwitch WHERE accountID = :accountID");
 		$updateAccountSettings->execute([':accountID' => $accountID, ':messagesState' => $messagesState, ':friendRequestsState' => $friendRequestsState, ':commentsState' => $commentsState, ':socialsYouTube' => $socialsYouTube, ':socialsTwitter' => $socialsTwitter, ':socialsTwitch' => $socialsTwitch]);
 		
 		self::logAction($person, Action::ProfileSettingsChange, $messagesState, $friendRequestsState, $commentsState, $socialsYouTube, $socialsTwitter, $socialsTwitch);
+		
+		return true;
 	}
 	
 	public static function getFriends($accountID) {
@@ -312,6 +320,7 @@ class Library {
 	
 	public static function getUserString($user) {
 		$user['userName'] = Library::makeClanUsername($user['extID']);
+		
 		return $user['userID'].':'.$user["userName"].':'.$user['extID'];
 	}
 	
@@ -342,6 +351,8 @@ class Library {
 	
 	public static function deleteAccountComment($person, $commentID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		$userName = $person['userName'];
@@ -536,6 +547,8 @@ class Library {
 	public static function getPersonRoles($person) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		if(isset($GLOBALS['core_cache']['roles'][$person['accountID']])) return $GLOBALS['core_cache']['roles'][$person['accountID']];
 		
 		$roleIDs = [];
@@ -557,6 +570,8 @@ class Library {
 	}
 	
 	public static function checkPermission($person, $permission) {
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		if(isset($GLOBALS['core_cache']['permissions'][$permission][$person['accountID']])) return $GLOBALS['core_cache']['permissions'][$permission][$person['accountID']];
 		
 		$isAdmin = self::isAccountAdministrator($person['accountID']);
@@ -608,6 +623,12 @@ class Library {
 	}
 	
 	public static function getPersonCommentAppearance($person) {
+		if($person['accountID'] == 0 || $person['userID'] == 0) return [
+			'commentsExtraText' => '',
+			'modBadgeLevel' => 0,
+			'commentColor' => '255,255,255'
+		];
+		
 		if(isset($GLOBALS['core_cache']['roleAppearance'][$person['accountID']])) return $GLOBALS['core_cache']['roleAppearance'][$person['accountID']];
 		
 		$getRoles = self::getPersonRoles($person);
@@ -747,7 +768,7 @@ class Library {
 			case 'friends':
 				$friendsArray = Library::getFriends($accountID);
 				$friendsArray[] = $accountID;
-				$friendsString = implode(",", $friendsArray);
+				$friendsString = "'".implode("','", $friendsArray)."'";
 				
 				$leaderboard = $db->prepare("SELECT * FROM users WHERE extID IN (".$friendsString.") ORDER BY stars + moons DESC, userName ASC");
 				$leaderboard->execute();
@@ -756,8 +777,8 @@ class Library {
 				$queryText = self::getBannedPeopleQuery(0, true);
 
 				$leaderboard = $db->prepare("SELECT users.*, SUM(actions.value) AS stars, SUM(actions.value2) AS coins, SUM(actions.value3) AS demons FROM actions
-					INNER JOIN users ON actions.account = users.extID WHERE type = '9' AND timestamp > :time AND ".$queryText." actions.value > 0
-					ORDER BY stars DESC, userName ASC LIMIT 100");
+					INNER JOIN users ON actions.account = users.extID WHERE type = '9' AND ".$queryText." timestamp > :time AND stars > 0
+					GROUP BY account ORDER BY stars DESC, userName ASC LIMIT 100");
 				$leaderboard->execute([':time' => time() - 604800]);
 				break;
 		}
@@ -782,6 +803,8 @@ class Library {
 	public static function getAccountMessages($person, $getSent, $pageOffset) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$messages = $db->prepare("SELECT * FROM messages JOIN users ON messages.".($getSent ? 'toAccountID' : 'accountID')." = users.extID WHERE messages.".($getSent ? 'accountID' : 'toAccountID')." = :accountID ORDER BY messages.timestamp DESC LIMIT 10 OFFSET ".$pageOffset);
@@ -799,6 +822,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
 		require_once __DIR__."/XOR.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -818,6 +843,8 @@ class Library {
 	}
 	
 	public static function canSendMessage($person, $toAccountID) {
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		if(isset($GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID];
 		
 		if($person['accountID'] == $toAccountID) {
@@ -884,6 +911,8 @@ class Library {
 	public static function sendMessage($person, $toAccountID, $subject, $body) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$sendMessage = $db->prepare("INSERT INTO messages (subject, body, accountID, toAccountID, timestamp)
@@ -895,6 +924,8 @@ class Library {
 	
 	public static function deleteMessages($person, $messages) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		if(!$messages) return false;
 		
@@ -946,6 +977,8 @@ class Library {
 	public static function getFriendships($person) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		if(isset($GLOBALS['core_cache']['friendships'][$accountID])) return $GLOBALS['core_cache']['friendships'][$accountID];
@@ -967,6 +1000,8 @@ class Library {
 	public static function getBlocks($person) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		if(isset($GLOBALS['core_cache']['blocks'][$accountID])) return $GLOBALS['core_cache']['blocks'][$accountID];
@@ -982,6 +1017,8 @@ class Library {
 	
 	public static function removeFriend($person, $targetAccountID, $logAction = true) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -999,6 +1036,8 @@ class Library {
 	public static function unblockUser($person, $targetAccountID) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$isBlocked = self::isPersonBlocked($accountID, $targetAccountID);
@@ -1014,6 +1053,8 @@ class Library {
 	
 	public static function getFriendRequests($person, $getSent, $pageOffset) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -1033,6 +1074,8 @@ class Library {
 	}
 	
 	public static function canSendFriendRequest($person, $toAccountID) {
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		if(isset($GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendFriendRequest'][$person['accountID']][$toAccountID];
 		
 		if($person['accountID'] == $toAccountID) {
@@ -1070,6 +1113,8 @@ class Library {
 	public static function sendFriendRequest($person, $toAccountID, $comment) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$sendFriendRequest = $db->prepare("INSERT INTO friendreqs (accountID, toAccountID, comment, uploadDate)
@@ -1084,6 +1129,8 @@ class Library {
 	public static function deleteFriendRequests($person, $accounts, $logAction = true) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$deleteFriendRequests = $db->prepare("DELETE FROM friendreqs WHERE (accountID = :accountID AND toAccountID IN (".$accounts.")) OR (toAccountID = :accountID AND accountID IN (".$accounts."))");
@@ -1096,6 +1143,8 @@ class Library {
 	
 	public static function acceptFriendRequest($person, $requestID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -1127,6 +1176,8 @@ class Library {
 	public static function blockUser($person, $targetAccountID) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$isBlocked = self::isPersonBlocked($accountID, $targetAccountID);
@@ -1145,6 +1196,8 @@ class Library {
 	
 	public static function readFriendRequest($person, $requestID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -1199,6 +1252,8 @@ class Library {
 	public static function isVaultCodeUsed($person, $rewardID) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return true;
+		
 		$accountID = $person['accountID'];
 		
 		$isVaultCodeUsed = $db->prepare("SELECT count(*) FROM actions WHERE type = 38 AND value = :vaultCode AND account = :accountID");
@@ -1210,6 +1265,8 @@ class Library {
 	
 	public static function useVaultCode($person, $vaultCode, $code) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		$IP = $person['IP'];
@@ -1246,6 +1303,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/security.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$userID = $person['userID'];
 		$IP = $person['IP'];
 		
@@ -1267,6 +1326,8 @@ class Library {
 	
 	public function uploadLevel($person, $levelID, $levelName, $levelString, $levelDetails) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return ['success' => false, 'error' => LoginError::WrongCredentials];
 		
 		$accountID = $person['accountID'];
 		$userID = $person['userID'];
@@ -1406,6 +1467,8 @@ class Library {
 	public static function addDownloadToLevel($person, $levelID) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		$IP = $person['IP'];
 		
@@ -1426,7 +1489,7 @@ class Library {
 	public static function showCommentsBanScreen($text, $time) {
 		$time = $time - time();
 		if($time < 0) $time = 0;
-		return $_POST['gameVersion'] > 20 ? 'temp_'.$time.'_'.$text : '-1';
+		return $_POST['gameVersion'] > 20 ? 'temp_'.$time.'_'.$text : '-10';
 	}
 	
 	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
@@ -1445,16 +1508,21 @@ class Library {
 	
 	public static function uploadComment($person, $levelID, $comment, $percent) {
 		require __DIR__."/connection.php";
+		require __DIR__."/../../config/misc.php";
 		require_once __DIR__."/exploitPatch.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$userID = $person['userID'];
 		$userName = $person['userName'];
 		
+		if($enableCommentLengthLimiter) $comment = mb_substr($comment, 0, $maxCommentLength);
+		
 		$comment = Escape::url_base64_encode($comment);
 		
-		$uploadAccountComment = $db->prepare("INSERT INTO comments (userID, levelID, percent, comment, timestamp)
+		$uploadComment = $db->prepare("INSERT INTO comments (userID, levelID, percent, comment, timestamp)
 			VALUES (:userID, :levelID, :percent, :comment, :timestamp)");
-		$uploadAccountComment->execute([':userID' => $userID, ':levelID' => $levelID, ':percent' => $percent, ':comment' => $comment, ':timestamp' => time()]);
+		$uploadComment->execute([':userID' => $userID, ':levelID' => $levelID, ':percent' => $percent, ':comment' => $comment, ':timestamp' => time()]);
 		$commentID = $db->lastInsertId();
 
 		self::logAction($person, Action::CommentUpload, $userName, $comment, $commentID, $levelID);
@@ -1577,6 +1645,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$level = self::getLevelByID($levelID);
 		
 		$realDifficulty = self::getLevelDifficulty($difficulty);
@@ -1614,6 +1684,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$isDaily = self::isLevelDaily($levelID, $type);
 		if($isDaily) return false;
@@ -1661,6 +1733,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$isEvent = self::isLevelEvent($levelID);
 		if($isEvent) return false;
 		
@@ -1704,6 +1778,8 @@ class Library {
 	public static function sendLevel($levelID, $person, $difficulty, $stars, $featured) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		$realDifficulty = self::getLevelDifficulty($difficulty);
@@ -1737,6 +1813,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$isDaily = self::isLevelDaily($levelID, $type);
 		if(!$isDaily) return false;
 		
@@ -1753,6 +1831,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$isEvent = self::isLevelEvent($levelID);
 		if(!$isEvent) return false;
 		
@@ -1768,6 +1848,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$targetAccountID = $player['extID'];
 		$targetUserID = $player['userID'];
@@ -1786,6 +1868,8 @@ class Library {
 	public static function lockUpdatingLevel($levelID, $person, $lockUpdating) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$lockLevel = $db->prepare("UPDATE levels SET updateLocked = :updateLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':updateLocked' => $lockUpdating, ':levelID' => $levelID]);
 		
@@ -1796,6 +1880,8 @@ class Library {
 	
 	public static function deleteComment($person, $commentID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$userID = $person['userID'];
 		
@@ -1817,6 +1903,8 @@ class Library {
 	public static function renameLevel($levelID, $person, $levelName) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$level = self::getLevelByID($levelID);
 		
 		$renameLevel = $db->prepare("UPDATE levels SET levelName = :levelName WHERE levelID = :levelID AND isDeleted = 0");
@@ -1829,6 +1917,8 @@ class Library {
 	
 	public static function changeLevelPassword($levelID, $person, $newPassword) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		if($newPassword == '000000') $newPassword = '';
 		
@@ -1847,6 +1937,8 @@ class Library {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$level = self::getLevelByID($levelID);
 		
 		$changeLevelSong = $db->prepare("UPDATE levels SET songID = :songID WHERE levelID = :levelID AND isDeleted = 0");
@@ -1862,6 +1954,8 @@ class Library {
 	public static function changeLevelDescription($levelID, $person, $description) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$userID = $person['userID'];
 		
@@ -1881,6 +1975,8 @@ class Library {
 	public static function changeLevelPrivacy($levelID, $person, $privacy) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$changeLevelPrivacy = $db->prepare("UPDATE levels SET unlisted = :privacy, unlisted2 = :privacy WHERE levelID = :levelID AND isDeleted = 0");
 		$changeLevelPrivacy->execute([':levelID' => $levelID, ':privacy' => $privacy]);
 		
@@ -1893,6 +1989,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$changeLevel = $db->prepare("UPDATE levels SET isCPShared = 1 WHERE levelID = :levelID");
 		$changeLevel->execute([':levelID' => $levelID]);
@@ -1915,6 +2013,8 @@ class Library {
 	
 	public static function lockCommentingOnLevel($levelID, $person, $lockCommenting) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 
 		$lockLevel = $db->prepare("UPDATE levels SET commentLocked = :commentLocked WHERE levelID = :levelID AND isDeleted = 0");
 		$lockLevel->execute([':commentLocked' => $lockCommenting, ':levelID' => $levelID]);
@@ -1927,6 +2027,8 @@ class Library {
 	public static function isAbleToComment($levelID, $person) {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/security.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return ["success" => false, "error" => LoginError::WrongCredentials];
 		
 		$checkBan = self::getPersonBan($person, 3);
 		if($checkBan) return ["success" => false, "error" => CommonError::Banned, "info" => $checkBan];
@@ -1943,6 +2045,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$userID = $person['userID'];
 		
@@ -1963,6 +2067,8 @@ class Library {
 	
 	public static function voteForLevelDifficulty($levelID, $person, $rating) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		if(self::isVotedForLevelDifficulty($levelID, $person, $rating > 5)) return false;
 		
@@ -1994,6 +2100,8 @@ class Library {
 	
 	public static function submitLevelScore($levelID, $person, $percent, $attempts, $clicks, $time, $progresses, $coins, $dailyID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		$condition = $dailyID ? ">" : "=";
@@ -2043,7 +2151,7 @@ class Library {
 			case 0:
 				$friendsArray = self::getFriends($accountID);
 				$friendsArray[] = $accountID;
-				$friendsString = implode(",", $friendsArray);
+				$friendsString = "'".implode("','", $friendsArray)."'";
 				$getLevelScores = $db->prepare("SELECT *, levelscores.coins AS scoreCoins FROM levelscores INNER JOIN users ON users.extID = levelscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND accountID IN (".$friendsString.") ORDER BY percent DESC, uploadDate ASC");
 				$getLevelScores->execute([':levelID' => $levelID]);
 				break;
@@ -2066,6 +2174,8 @@ class Library {
 	
 	public static function submitPlatformerLevelScore($levelID, $person, $scores, $attempts, $clicks, $progresses, $coins, $dailyID, $mode) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		$condition = $dailyID ? ">" : "=";
@@ -2119,7 +2229,7 @@ class Library {
 			case 0:
 				$friendsArray = self::getFriends($accountID);
 				$friendsArray[] = $accountID;
-				$friendsString = implode(",", $friendsArray);
+				$friendsString = "'".implode("','", $friendsArray)."'";
 				$getLevelScores = $db->prepare("SELECT *, platscores.coins AS scoreCoins FROM platscores INNER JOIN users ON users.extID = platscores.accountID WHERE ".$queryText." dailyID ".$condition." 0 AND levelID = :levelID AND accountID IN (".$friendsString.") ORDER BY ".$mode." ".$order.", timestamp ASC");
 				$getLevelScores->execute([':levelID' => $levelID]);
 				break;
@@ -2195,6 +2305,8 @@ class Library {
 	
 	public static function isVotedForLevelDifficulty($levelID, $person, $isDemonVote) {
 		require_once __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return true;
 	
 		$filters[] = "type = ".($isDemonVote ? Action::LevelVoteDemon : Action::LevelVoteNormal);
 		$filters[] = "value = ".$levelID;
@@ -2277,6 +2389,8 @@ class Library {
 	public static function addDownloadToList($person, $listID) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		$IP = $person['IP'];
 		
@@ -2325,6 +2439,8 @@ class Library {
 	public static function uploadList($person, $listID, $listDetails) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$accountID = $person['accountID'];
 		
 		if($listID != 0) {
@@ -2350,6 +2466,8 @@ class Library {
 	
 	public static function deleteList($listID, $person) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -2378,6 +2496,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$list = self::getListByID($listID);
 		
@@ -2447,6 +2567,8 @@ class Library {
 	public static function changeListPrivacy($listID, $person, $privacy) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$changeListPrivacy = $db->prepare("UPDATE lists SET unlisted = :privacy WHERE listID = :listID");
 		$changeListPrivacy->execute([':listID' => $listID, ':privacy' => $privacy]);
 		
@@ -2459,6 +2581,8 @@ class Library {
 		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		require_once __DIR__."/cron.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$targetAccountID = $player['extID'];
 		$targetUserID = $player['userID'];
@@ -2475,6 +2599,8 @@ class Library {
 	public static function renameList($listID, $person, $listName) {
 		require __DIR__."/connection.php";
 		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		
 		$list = self::getListByID($listID);
 		
 		$renameList = $db->prepare("UPDATE lists SET listName = :listName WHERE listID = :listID");
@@ -2488,6 +2614,8 @@ class Library {
 	public static function changeListDescription($listID, $person, $description) {
 		require __DIR__."/connection.php";
 		require_once __DIR__."/exploitPatch.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -2506,6 +2634,8 @@ class Library {
 	
 	public static function lockCommentingOnList($listID, $person, $lockCommenting) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 
 		$lockLevel = $db->prepare("UPDATE lists SET commentLocked = :commentLocked WHERE listID = :listID");
 		$lockLevel->execute([':commentLocked' => $lockCommenting, ':listID' => $listID]);
@@ -2517,6 +2647,8 @@ class Library {
 	
 	public static function sendList($listID, $person, $reward, $difficulty, $featured, $levelsCount) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		
@@ -2536,6 +2668,8 @@ class Library {
 	
 	public static function isListSent($listID, $accountID) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return true;
 		
 		$isSent = $db->prepare("SELECT count(*) FROM suggest WHERE suggestLevelId = :listID AND suggestBy = :accountID");
 		$isSent->execute([':listID' => ($listID * -1), ':accountID' => $accountID]);
@@ -3254,6 +3388,8 @@ class Library {
 	
 	public static function rateItem($person, $itemID, $type, $isLike) {
 		require __DIR__."/connection.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		$accountID = $person['accountID'];
 		$IP = $person['IP'];

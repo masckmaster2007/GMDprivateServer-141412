@@ -18,6 +18,8 @@ $leaderboard = Library::getLeaderboard($person, $type, $count);
 $rank = $leaderboard['rank'];
 
 foreach($leaderboard['leaderboard'] AS &$user) {
+	if($user['stars'] <= 0 && $type == 'week') break;
+	
 	$rank++;
 	
 	$user["userName"] = Library::makeClanUsername($user['extID']);

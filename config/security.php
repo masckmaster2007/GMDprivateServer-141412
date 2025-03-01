@@ -3,7 +3,7 @@
 	Submissions by unregistered accounts
 	
 	Should unregistered accounts be able to upload levels, post comments, etc. Required for <1.9 GDPSs:
-		True — unregistered accounts can do everything
+		True — unregistered accounts can interact with GDPS
 		False — only registered accounts can interact with GDPS
 */
 $unregisteredSubmissions = false;
@@ -21,6 +21,8 @@ $preactivateAccounts = true;
 	Debug mode
 
 	Show errors on page if hosting supports it
+		True — show errors
+		False — disable errors reporting (recommended for production)
 */
 $debugMode = true;
 
