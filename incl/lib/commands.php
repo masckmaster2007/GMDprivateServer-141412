@@ -16,7 +16,7 @@ class Commands {
 		switch($command) {
 			case '!rate':
 			case '!r':
-				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRate')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 
 				$difficulty = Escape::latin($commentSplit[1]);
 				if(!is_numeric($commentSplit[2])) {
@@ -28,27 +28,27 @@ class Commands {
 				$featured = Escape::number($commentSplit[4 + $increaseSplit]);
 				
 				if(!$difficulty || !is_numeric($stars) || !is_numeric($verifyCoins) || !is_numeric($featured)) {
-					return "Incorrect usage!".PHP_EOL
-						."!rate *difficulty* *stars* *are coins verified* *featured/epic/legendary/mythic*".PHP_EOL
-						."Example: !rate harder 7 1 4";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!rate ".Library::textColor("*difficulty*", Color::Orange)." ".Library::textColor("*stars*", Color::Orange)." ".Library::textColor("*are coins verified*", Color::Orange)." ".Library::textColor("*featured/epic/legendary/mythic*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!rate harder 7 1 4", Color::LightYellow);
 				}
 
-				if(!$stars) return "Please use !unrate to unrate level.";
+				if(!$stars) return "Please use ".Library::textColor("!unrate", Color::Red)." to unrate level.";
 				
-				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't rate your own level.";
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You ".Library::textColor("can't", Color::Red)." rate your own level.";
 				
 				$rateLevel = Library::rateLevel($levelID, $person, $difficulty, $stars, $verifyCoins, $featured);
 				
-				return "You successfully rated ".$level['levelName'].' as '.$rateLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
+				return "You ".Library::textColor("successfully", Color::Green)." rated ".Library::textColor($level['levelName'], Color::SkyBlue).' as '.Library::textColor($rateLevel, Color::Yellow).', '.$stars .' star'.($stars > 1 ? 's!' : '!');
 			case '!unrate':
 			case '!unr':
-				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRate')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
-				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't unrate your own level.";
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You ".Library::textColor("can't", Color::Red)." unrate your own level.";
 				
 				Library::rateLevel($levelID, $person, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), 0, 0, 0);
 				
-				return "You successfully unrated ".$level['levelName'].'!';
+				return "You ".Library::textColor("successfully", Color::Green)." unrated ".Library::textColor($level['levelName'], Color::SkyBlue).'!';
 			case '!feature':
 			case '!epic':
 			case '!legendary':
@@ -81,18 +81,20 @@ class Commands {
 				$featured = $commandArray[$command];
 				
 				$featurePermission = $featured < 2 && $level['starEpic'] == 0 ? 'Feature' : 'Epic';
-				if(!Library::checkPermission($person, 'command'.$featurePermission)) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'command'.$featurePermission)) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
-				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't ".(!$featured ? 'un' : '')."feature your own level.";
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You ".Library::textColor("can't", Color::Red)." ".(!$featured ? 'un' : '')."feature your own level.";
+				
+				if(($featured == 1 && $level['starFeatured'] && !$level['starEpic']) || ($featured - 1 == $level['starEpic'])) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".($featured ? '' : 'un')."featured!";
 				
 				Library::rateLevel($levelID, $person, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), $level['starStars'], $level['starCoins'], $featured);
 				
-				return "You successfully ".sprintf($returnTextArray[$featured], $level['levelName']);
+				return "You ".Library::textColor("successfully", Color::Green)." ".sprintf($returnTextArray[$featured], Library::textColor($level['levelName'], Color::SkyBlue));
 			case '!verifycoins':
 			case '!unverifycoins':
 			case '!vc':
 			case '!unvc':
-				if(!Library::checkPermission($person, 'commandVerifycoins')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandVerifycoins')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$commandArray = [
 					'!verifycoins' => 1, '!vc' => 1,
@@ -102,13 +104,15 @@ class Commands {
 				$returnTextArray = ['unverified coins in %1$s!', 'verified coins in %1$s!'];
 				$verifyCoins = $commandArray[$command];
 				
-				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't ".(!$verifyCoins ? 'un' : '')."verify coins on your own level.";
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You ".Library::textColor("can't", Color::Red)." ".(!$verifyCoins ? 'un' : '')."verify coins on your own level.";
+				
+				if($verifyCoins == $level['starCoins']) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." ".(!$verifyCoins ? 'un' : '')."verified coins!";
 				
 				$featured = $level['starEpic'] + ($level['starFeatured'] ? 1 : 0);
 				
 				Library::rateLevel($levelID, $person, Library::prepareDifficultyForRating(($level['starDifficulty'] / $level['difficultyDenominator']), $level['starAuto'], $level['starDemon'], $level['starDemonDiff']), $level['starStars'], $verifyCoins, $featured);
 				
-				return "You successfully ".sprintf($returnTextArray[$verifyCoins], $level['levelName']);
+				return "You ".Library::textColor("successfully", Color::Green)." ".sprintf($returnTextArray[$verifyCoins], Library::textColor($level['levelName'], Color::SkyBlue));
 			case '!daily':
 			case '!weekly':
 			case '!da':
@@ -120,13 +124,13 @@ class Commands {
 				$type = $typeArray[$command];
 				
 				$dailyPermission = $type ? 'Weekly' : 'Daily';
-				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$setDaily = Library::setLevelAsDaily($levelID, $person, $type);
-				if(!$setDaily) return $level['levelName']." is already ".($type ? 'weekly' : 'daily')."!";
+				if(!$setDaily) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".($type ? 'weekly' : 'daily')."!";
 				
-				return "You successfully set ".$level['levelName']." as ".($type ? 'weekly' : 'daily')."!".PHP_EOL
-					."It will appear ".Library::makeTime($setDaily).'.';
+				return "You ".Library::textColor("successfully", Color::Green)." set ".Library::textColor($level['levelName'], Color::SkyBlue)." as ".($type ? 'weekly' : 'daily')."!".PHP_EOL
+					."It will appear ".Library::textColor(Library::makeTime($setDaily), Color::Yellow).'.';
 			case '!undaily':
 			case '!unda':
 			case '!unweekly':
@@ -138,48 +142,48 @@ class Commands {
 				$type = $typeArray[$command];
 				
 				$dailyPermission = $type ? 'Weekly' : 'Daily';
-				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'command'.$dailyPermission)) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$removeDaily = Library::removeDailyLevel($levelID, $person, $type);
-				if(!$removeDaily) return $level['levelName']." is not ".($type ? 'weekly' : 'daily')." level!";
+				if(!$removeDaily) return Library::textColor($level['levelName'], Color::SkyBlue)." is not ".($type ? 'weekly' : 'daily')." level!";
 				
-				return "You successfully removed ".$level['levelName']." from ".($type ? 'weekly' : 'daily')." levels!";
+				return "You ".Library::textColor("successfully", Color::Green)." removed ".Library::textColor($level['levelName'], Color::SkyBlue)." from ".($type ? 'weekly' : 'daily')." levels!";
 			case '!event':
 			case '!ev':
-				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandEvent')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				if(!is_numeric($commentSplit[1])) {
-					return "Incorrect usage!".PHP_EOL
-						."!event *duration in minutes* *reward type* *reward amount*".PHP_EOL
-						."Example: !event 60 7 1000 8 20 1001 379";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!event ".Library::textColor("*duration in minutes*", Color::Orange)." ".Library::textColor("*reward type*", Color::Orange)." ".Library::textColor("*reward amount*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!event 60 7 1000 8 20 1001 379", Color::LightYellow);
 				}
 				$duration = Escape::number($commentSplit[1]) * 60;
 				unset($commentSplit[0], $commentSplit[1]);
 				$rewards = implode(",", $commentSplit);
 				
 				if(!$duration || $duration < 0 || !$rewards || $rewards != Escape::multiple_ids($rewards)) {
-					return "Incorrect usage!".PHP_EOL
-						."!event *duration in minutes* *reward type* *reward amount*".PHP_EOL
-						."Example: !event 60 7 1000 8 20 1001 379";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!event ".Library::textColor("*duration in minutes*", Color::Orange)." ".Library::textColor("*reward type*", Color::Orange)." ".Library::textColor("*reward amount*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!event 60 7 1000 8 20 1001 379", Color::LightYellow);
 				}
 				
 				$setEvent = Library::setLevelAsEvent($levelID, $person, $duration, $rewards);
-				if(!$setEvent) return $level['levelName']." is already event level!";
+				if(!$setEvent) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." event level!";
 				
-				return "You successfully set ".$level['levelName']." as event level!".PHP_EOL
+				return "You ".Library::textColor("successfully", Color::Green)." set ".Library::textColor($level['levelName'], Color::SkyBlue)." as event level!".PHP_EOL
 					."It will appear ".Library::makeTime($setEvent).'.';
 			case "!unevent":
 			case "!unev":
-				if(!Library::checkPermission($person, 'commandEvent')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandEvent')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 
 				$removeEvent = Library::removeEventLevel($levelID, $person);
-				if(!$removeEvent) return $level['levelName']." is not event level!";
+				if(!$removeEvent) return Library::textColor($level['levelName'], Color::SkyBlue)." is not event level!";
 				
-				return "You successfully removed ".$level['levelName']." from event levels!";
+				return "You ".Library::textColor("successfully", Color::Green)." removed ".Library::textColor($level['levelName'], Color::SkyBlue)." from event levels!";
 			case '!send':
 			case '!suggest':
 			case '!sug':
-				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$difficulty = Escape::latin($commentSplit[1]);
 				if(!is_numeric($commentSplit[2])) {
@@ -190,137 +194,151 @@ class Commands {
 				$featured = Escape::number($commentSplit[3 + $increaseSplit]);
 				
 				if(!$difficulty || !$stars || !is_numeric($featured)) {
-					return "Incorrect usage!".PHP_EOL
-						."!send *difficulty* *stars* *featured/epic/legendary/mythic*".PHP_EOL
-						."Example: !send harder 7 4";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!send ".Library::textColor("*difficulty*", Color::Orange)." ".Library::textColor("*stars*", Color::Orange)." ".Library::textColor("*featured/epic/legendary/mythic*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!send harder 7 4", Color::LightYellow);
 				}
 				
-				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You can't suggest your own level.";
+				if($dontRateYourOwnLevels && $person['userID'] == $level['userID']) return "You ".Library::textColor("can't", Color::Red)." suggest your own level.";
 				
 				$sendLevel = Library::sendLevel($levelID, $person, $difficulty, $stars, $featured);
-				if(!$sendLevel) return "You already suggested ".$level['levelName']."!";
+				if(!$sendLevel) return "You ".Library::textColor("already suggested", Color::Green)." ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 				
-				return "You successfully sent ".$level['levelName'].' as '.$sendLevel.', '.$stars .' star'.($stars > 1 ? 's!' : '!');
-			case '!unsuggest':
+				return "You ".Library::textColor("successfully", Color::Green)." sent ".Library::textColor($level['levelName'], Color::SkyBlue).' as '.Library::textColor($sendLevel, Color::Yellow).', '.$stars .' star'.($stars > 1 ? 's!' : '!');
 			case '!unsend':
+			case '!unsuggest':
 			case '!unsug':
-				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$unsendLevel = Library::unsendLevel($levelID, $person);
-				if(!$unsendLevel) return "You haven't suggested ".$level['levelName'].'!';
+				if(!$unsendLevel) return "You ".Library::textColor("haven't suggested", Color::Red)." ".Library::textColor($level['levelName'], Color::SkyBlue).'!';
 				
-				return "You successfully unsent ".$level['levelName'].'!';
+				return "You ".Library::textColor("successfully", Color::Green)." unsent ".Library::textColor($level['levelName'], Color::SkyBlue).'!';
 			case '!setacc':
 			case '!account':
 			case '!move':
 			case '!sa':
 			case '!acc':
 			case '!m':
-				if(!Library::checkPermission($person, 'commandSetacc')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSetacc')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
+			
+				if(empty($commentSplit[1])) {
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!move ".Library::textColor("*player*", Color::Orange).PHP_EOL
+						."Examples: ".PHP_EOL
+						.Library::textColor("!move MegaSa1nt - move level to MegaSa1nt", Color::LightYellow).PHP_EOL
+						.Library::textColor("!move 71 - move level to player with account ID 71", Color::LightYellow).PHP_EOL
+						.Library::textColor("!move u5 - move level to player with user ID 5", Color::LightYellow);
+				}
 			
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
-				if(!$player) return "This user was not found!";
+				if(!$player) return "This user was ".Library::textColor("not found", Color::Red).".";
 				
-				if($player['extID'] == $level['extID']) return "User ".$player['userName']." already owns level ".$level['levelName']."!";
+				if($player['extID'] == $level['extID']) return "User ".Library::textColor($player['userName'], Color::SkyBlue)." ".Library::textColor("already owns", Color::Green)." level ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 				
 				Library::moveLevel($levelID, $person, $player);
 				
-				return "You successfully moved ".$level['levelName']." to user ".$player['userName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." moved ".Library::textColor($level['levelName'], Color::SkyBlue)." to user ".Library::textColor($player['userName'], Color::SkyBlue)."!";
 			case '!lockUpdating':
 			case '!unlockUpdating':
 			case '!lu':
 			case '!unlu':
-				if(!Library::checkPermission($person, 'commandLockUpdating')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandLockUpdating')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$lockUpdatingArray = [
 					'!lockUpdating' => 1, '!lu' => 1,
 					'!unlockUpdating' => 0, '!unlu' => 0
 				];
 				$lockUpdating = $lockUpdatingArray[$command];
-				if($level['updateLocked'] == $lockUpdating) return $level['levelName']." is already ".(!$lockUpdating ? 'un' : '')."locked!";
+				if($level['updateLocked'] == $lockUpdating) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".(!$lockUpdating ? 'un' : '')."locked!";
 				
 				Library::lockUpdatingLevel($levelID, $person, $lockUpdating);
 				
-				return "You successfully ".(!$lockUpdating ? 'un' : '')."locked ".$level['levelName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." ".(!$lockUpdating ? 'un' : '')."locked ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 			case "!rename":
 			case "!re":
-				if(!Library::checkPermission($person, 'commandRename') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRename') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				unset($commentSplit[0]);
 				$newLevelName = trim(Escape::latin(implode(' ', $commentSplit)));
 				if(!$newLevelName) {
-					return "Incorrect usage!".PHP_EOL
-						."!rename *level name*".PHP_EOL
-						."Example: !rename My cool level";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!rename ".Library::textColor("*level name*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!rename My cool level", Color::LightYellow);
 				}
 				
-				if($level['levelName'] == $newLevelName) return $level['levelName']." already has this name!";
+				if($level['levelName'] == $newLevelName) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this name!";
+				
+				if(Library::stringViolatesFilter($newLevelName, 3)) return "New level name contains a ".Library::textColor("bad", Color::Red)." word.";
 				
 				Library::renameLevel($levelID, $person, $newLevelName);
 				
-				return "You successfully renamed ".$level['levelName']." to ".$newLevelName."!";
+				return "You ".Library::textColor("successfully", Color::Green)." renamed ".Library::textColor($level['levelName'], Color::SkyBlue)." to ".$newLevelName."!";
 			case "!password":
 			case "!pass":
 			case "!p":
-				if(!Library::checkPermission($person, 'commandPass') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandPass') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				if(!$commentSplit[1] || !is_numeric($commentSplit[1]) || strlen($commentSplit[1]) > 6) {
-					return "Incorrect usage!".PHP_EOL
-						."!password *level password*".PHP_EOL
-						."Example: !password 141412";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!password ".Library::textColor("*level password*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!password 141412", Color::LightYellow).PHP_EOL
+						."Maximum password length is ".Library::textColor("6 characters", Color::Green);
 				}
 				
 				$newPassword = sprintf("%06d", Escape::number($commentSplit[1]));
 				
-				if($level['password'] == '1'.$newPassword || $level['password'].'000000' == '1'.$newPassword) return $level['levelName']." already has this password!";
+				if($level['password'] == '1'.$newPassword || $level['password'].'000000' == '1'.$newPassword) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this password!";
 				
 				Library::changeLevelPassword($levelID, $person, $newPassword);
 				
-				return "You successfully changed password of ".$level['levelName'].' to '.$newPassword."!";
+				return "You ".Library::textColor("successfully", Color::Green)." changed password of ".Library::textColor($level['levelName'], Color::SkyBlue).' to '.Library::textColor($newPassword, Color::Yellow)."!";
 			case "!song":
 			case "!s":
-				if(!Library::checkPermission($person, 'commandSong') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSong') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$songID = Escape::number($commentSplit[1]);
 				if(!$songID) {
-					return "Incorrect usage!".PHP_EOL
-						."!song *song ID*".PHP_EOL
-						."Example: !song 1967605";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!song ".Library::textColor("*song ID*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!song 1967605", Color::LightYellow);
 				}
 				
-				if($level["songID"] == $songID) return $level['levelName']." already has this song!";
+				if($level["songID"] == $songID) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this song!";
 				
 				$song = Library::getSongByID($songID);
-				if(!$song) return "This song doesn't exist!";
+				if(!$song) return "This song ".Library::textColor("doesn't exist", Color::Red)."!";
 				
 				Library::changeLevelSong($levelID, $person, $songID);
 				
-				return "You successfully changed song of ".$level['levelName']." to ".Escape::translit($song['authorName'])." - ".Escape::translit($song['name'])."!";
+				return "You ".Library::textColor("successfully", Color::Green)." changed song of ".Library::textColor($level['levelName'], Color::SkyBlue)." to ".Library::textColor(Escape::translit($song['authorName'])." - ".Escape::translit($song['name']), Color::Yellow)."!";
 			case "!description":
 			case "!desc":
-				if(!Library::checkPermission($person, 'commandDescription') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDescription') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				unset($commentSplit[0]);
 				$newLevelDesc = Library::escapeDescriptionCrash(trim(Escape::text(implode(' ', $commentSplit))));
 				if(!$newLevelDesc) {
-					return "Incorrect usage!".PHP_EOL
-						."!description *level description*".PHP_EOL
-						."Example: !description This is my cool level i made in 3 hours. Please enjoy!";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!description ".Library::textColor("*level description*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!description This is my cool level i made in 3 hours. Please enjoy!", Color::LightYellow);
 				}
 				
-				if(Escape::url_base64_decode($level['levelDesc']) == $newLevelDesc) return $level['levelName']." already has this description!";
+				if(Escape::url_base64_decode($level['levelDesc']) == $newLevelDesc) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this description!";
+				
+				if(Library::stringViolatesFilter($newLevelDesc, 3)) return "New level description contains a ".Library::textColor("bad", Color::Red)." word.";
 				
 				Library::changeLevelDescription($levelID, $person, $newLevelDesc);
 				
-				return "You successfully changed description of ".$level['levelName']." to:".PHP_EOL
-					.$newLevelDesc;
+				return "You ".Library::textColor("successfully", Color::Green)." changed description of ".Library::textColor($level['levelName'], Color::SkyBlue)." to:".PHP_EOL
+					.Library::textColor($newLevelDesc, Color::Yellow);
 			case "!public":
 			case "!unlist":
 			case "!friends":
 			case "!pub":
 			case "!unl":
 			case "!fr":
-				if(!Library::checkPermission($person, 'commandPublic') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandPublic') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$privacyArray = [
 					'!public' => 0, '!pub' => 0,
@@ -330,52 +348,62 @@ class Commands {
 				$privacyText = ['public', 'only for friends', 'unlisted'];
 				$privacy = $privacyArray[$command];
 				
-				if($level['unlisted'] == $privacy) return $level['levelName']." is already ".$privacyText[$privacy]."!";
+				if($level['unlisted'] == $privacy) return Library::textColor($level['levelName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".$privacyText[$privacy]."!";
 				
 				Library::changeLevelPrivacy($levelID, $person, $privacy);
 				
-				return "You successfully made ".$level['levelName']." ".$privacyText[$privacy]."!";
+				return "You ".Library::textColor("successfully", Color::Green)." made ".Library::textColor($level['levelName'], Color::SkyBlue)." ".$privacyText[$privacy]."!";
 			case "!sharecp":
+			case "!share":
 			case "!cp":
-				if(!Library::checkPermission($person, 'commandSharecp')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSharecp')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
+			
+				if(empty($commentSplit[1])) {
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!share ".Library::textColor("*player*", Color::Orange).PHP_EOL
+						."Examples: ".PHP_EOL
+						.Library::textColor("!share MegaSa1nt - share CP of level with MegaSa1nt", Color::LightYellow).PHP_EOL
+						.Library::textColor("!share 71 - share CP of level with player with account ID 71", Color::LightYellow).PHP_EOL
+						.Library::textColor("!share u5 - share CP of level with player with user ID 5", Color::LightYellow);
+				}
 			
 				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
-				if(!$player) return "This user was not found!";
+				if(!$player) return "This user was ".Library::textColor("not found", Color::Red).".";
 				
-				if($player['extID'] == $level['extID']) return "User ".$player['userName']." is creator of ".$level['levelName']."!";
+				if($player['extID'] == $level['extID']) return "User ".Library::textColor($player['userName'], Color::SkyBlue)." is creator of ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 				
 				$shareCreatorPoints = Library::shareCreatorPoints($levelID, $person, $player['userID']);
-				if(!$shareCreatorPoints) return "User ".$player['userName']." have already been shared Creator Points from ".$level['levelName']."!";
+				if(!$shareCreatorPoints) return "User ".Library::textColor($player['userName'], Color::SkyBlue)." have already been shared Creator Points from ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 				
-				return "You successfully shared Creator Points from ".$level['levelName']." with user ".$player['userName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." shared Creator Points from ".Library::textColor($level['levelName'], Color::SkyBlue)." with user ".Library::textColor($player['userName'], Color::SkyBlue)."!";
 			case '!lockComments':
 			case '!unlockComments':
 			case '!lc':
 			case '!unlc':
-				if(!Library::checkPermission($person, 'commandLockComments') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandLockComments') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$lockCommentingArray = [
 					'!lockComments' => 1, '!lc' => 1,
 					'!unlockComments' => 0, '!unlc' => 0
 				];
 				$lockCommenting = $lockCommentingArray[$command];
-				if($level['commentLocked'] == $lockCommenting) return "Comments on ".$level['levelName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
+				if($level['commentLocked'] == $lockCommenting) return "Comments on ".Library::textColor($level['levelName'], Color::SkyBlue)." are already ".(!$lockCommenting ? 'un' : '')."locked!";
 				
 				Library::lockCommentingOnLevel($levelID, $person, $lockCommenting);
 				
-				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on ".$level['levelName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." ".(!$lockCommenting ? 'un' : '')."locked comments on ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 			case '!delete':
 			case '!delet':
 			case '!del':
 			case '!d':
-				if(!Library::checkPermission($person, 'commandDelete') && $person['userID'] != $level['userID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDelete') && $person['userID'] != $level['userID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				Library::deleteLevel($levelID, $person);
 				
-				return "You successfully deleted ".$level['levelName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." deleted ".Library::textColor($level['levelName'], Color::SkyBlue)."!";
 		}
 		
-		return "Command ".$command." was not found.";
+		return "Command ".Library::textColor($command, Color::SkyBlue)." was ".Library::textColor("not found", Color::Red).".";
 	}
 	
 	public static function processListCommand($comment, $list, $person) {
@@ -394,7 +422,7 @@ class Commands {
 		switch($command) {
 			case '!rate':
 			case '!r':
-				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRate')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 
 				$reward = Escape::number($commentSplit[1]);
 				$difficulty = Escape::latin($commentSplit[2]);
@@ -408,34 +436,34 @@ class Commands {
 				if(empty($levelsCount)) $levelsCount = count(explode(',', $list['listlevels']));
 				
 				if(!is_numeric($reward) || !$difficulty || !is_numeric($featured)) {
-					return "Incorrect usage!".PHP_EOL
-						."!rate *reward amount* *difficulty* *is featured* *required levels amount to complete list*".PHP_EOL
-						."Example: !rate 50 harder 1 7";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!rate ".Library::textColor("*reward amount*", Color::Orange)." ".Library::textColor("*difficulty*", Color::Orange)." ".Library::textColor("*is featured*", Color::Orange)." ".Library::textColor("*required levels amount to complete list*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!rate 50 harder 1 7", Color::LightYellow);
 				}
 
 				if(!$reward) return "Please use !unrate to unrate list.";
 				
-				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't rate your own list.";
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You ".Library::textColor("can't", Color::Red)." rate your own list.";
 				
 				$rateList = Library::rateList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
 				
-				return "You successfully rated ".$list['listName'].' as '.$rateList.', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
+				return "You ".Library::textColor("successfully", Color::Green)." rated ".Library::textColor($list['listName'], Color::SkyBlue).' as '.Library::textColor($rateList, Color::Yellow).', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
 			case '!unrate':
 			case '!unr':
-				if(!Library::checkPermission($person, 'commandRate')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRate')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
-				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't unrate your own list.";
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You ".Library::textColor("can't", Color::Red)." unrate your own list.";
 				
 				Library::rateList($listID, $person, 0, $list['starDifficulty'], 0, 0);
 				
-				return "You successfully unrated ".$list['listName'].'!';
+				return "You ".Library::textColor("successfully", Color::Green)." unrated ".Library::textColor($list['listName'], Color::SkyBlue).'!';
 			case '!feature':
 			case '!unfeature':
 			case '!fea':
 			case '!unfea':
 			case '!f':
 			case '!unf':
-				if(!Library::checkPermission($person, 'commandFeature')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandFeature')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$commandArray = [
 					'!feature' => 1, '!fea' => 1, '!f' => 1,
@@ -443,27 +471,29 @@ class Commands {
 				];
 				$featuredValue = $commandArray[$command];
 				
-				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't ".(!$featuredValue ? 'un' : '')."feature your own list.";
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You ".Library::textColor("can't", Color::Red)." ".(!$featuredValue ? 'un' : '')."feature your own list.";
+				
+				if($featuredValue == $list['starFeatured']) return Library::textColor($list['listName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".($featuredValue ? '' : 'un')."featured!";
 				
 				Library::rateList($listID, $person, $list['starStars'], $list['starDifficulty'], $featuredValue, $list['countForReward']);
 				
-				return "You successfully ".(!$featuredValue ? 'un' : '')."featured ".$list['listName'].'!';
+				return "You ".Library::textColor("successfully", Color::Green)." ".(!$featuredValue ? 'un' : '')."featured ".Library::textColor($list['listName'], Color::SkyBlue).'!';
 			case '!delete':
 			case '!delet':
 			case '!del':
 			case '!d':
-				if(!Library::checkPermission($person, 'commandDelete') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDelete') && $person['accountID'] != $list['accountID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				Library::deleteList($listID, $person);
 				
-				return "You successfully deleted ".$list['listName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." deleted ".Library::textColor($list['listName'], Color::SkyBlue)."!";
 			case "!public":
 			case "!unlist":
 			case "!friends":
 			case "!pub":
 			case "!unl":
 			case "!fr":
-				if(!Library::checkPermission($person, 'commandPublic') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandPublic') && $person['accountID'] != $list['accountID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$privacyArray = [
 					'!public' => 0, '!pub' => 0,
@@ -473,82 +503,95 @@ class Commands {
 				$privacyText = ['public', 'only for friends', 'unlisted'];
 				$privacy = $privacyArray[$command];
 				
-				if($list['unlisted'] == $privacy) return $list['listName']." is already ".$privacyText[$privacy]."!";
+				if($list['unlisted'] == $privacy) return Library::textColor($list['listName'], Color::SkyBlue)." ".Library::textColor("is already", Color::Green)." ".$privacyText[$privacy]."!";
 				
 				Library::changeListPrivacy($listID, $person, $privacy);
 				
-				return "You successfully made ".$list['listName']." ".$privacyText[$privacy]."!";
+				return "You ".Library::textColor("successfully", Color::Green)." made ".Library::textColor($list['listName'], Color::SkyBlue)." ".$privacyText[$privacy]."!";
 			case '!setacc':
 			case '!account':
 			case '!move':
 			case '!sa':
 			case '!acc':
 			case '!m':
-				if(!Library::checkPermission($person, 'commandSetacc')) return "You don't have permissions to use command ".$command."!";
-			
-				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
-				if(!$player) return "This user was not found!";
+				if(!Library::checkPermission($person, 'commandSetacc')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
-				if($player['extID'] == $list['accountID']) return "User ".$player['userName']." already owns ".$list['listName']."!";
+				if(empty($commentSplit[1])) {
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!move ".Library::textColor("*player*", Color::Orange).PHP_EOL
+						."Examples: ".PHP_EOL
+						.Library::textColor("!move MegaSa1nt - move list to MegaSa1nt", Color::LightYellow).PHP_EOL
+						.Library::textColor("!move 71 - move list to player with account ID 71", Color::LightYellow).PHP_EOL
+						.Library::textColor("!move u5 - move list to player with user ID 5", Color::LightYellow);
+				}
+				
+				$player = Library::getUserFromSearch(Escape::latin($commentSplit[1]));
+				if(!$player) return "This user was ".Library::textColor("not found", Color::Red).".";
+				
+				if($player['extID'] == $list['accountID']) return "User ".Library::textColor($player['userName'], Color::SkyBlue)." ".Library::textColor("already owns", Color::Green)." ".Library::textColor($list['listName'], Color::SkyBlue)."!";
 				
 				Library::moveList($listID, $person, $player);
 				
-				return "You successfully moved ".$list['listName']." to user ".$player['userName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." moved ".Library::textColor($list['listName'], Color::SkyBlue)." to user ".Library::textColor($player['userName'], Color::SkyBlue)."!";
 			case "!rename":
 			case "!re":
-				if(!Library::checkPermission($person, 'commandRename') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandRename') && $person['accountID'] != $list['accountID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				unset($commentSplit[0]);
 				$newListName = trim(Escape::latin(implode(' ', $commentSplit)));
 				if(!$newListName) {
-					return "Incorrect usage!".PHP_EOL
-						."!rename *list name*".PHP_EOL
-						."Example: !rename My cool list";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!rename ".Library::textColor("*list name*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!rename My cool list", Color::LightYellow);
 				}
 				
-				if($list['listName'] == $newListName) return $list['listName']." already has this name!";
+				if($list['listName'] == $newListName) return Library::textColor($list['listName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this name!";
+				
+				if(Library::stringViolatesFilter($newLevelName, 3)) return "New list name contains a ".Library::textColor("bad", Color::Red)." word.";
 				
 				Library::renameList($listID, $person, $newListName);
 				
-				return "You successfully renamed ".$list['listName']." to ".$newListName."!";
+				return "You ".Library::textColor("successfully", Color::Green)." renamed ".Library::textColor($list['listName'], Color::SkyBlue)." to ".Library::textColor($newListName, Color::Yellow)."!";
 			case "!description":
 			case "!desc":
-				if(!Library::checkPermission($person, 'commandDescription') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandDescription') && $person['accountID'] != $list['accountID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				unset($commentSplit[0]);
 				$newListDesc = Library::escapeDescriptionCrash(trim(Escape::text(implode(' ', $commentSplit))));
 				if(!$newListDesc) {
-					return "Incorrect usage!".PHP_EOL
-						."!description *list description*".PHP_EOL
-						."Example: !description This is list with my favorite levels. Please enjoy!";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!description ".Library::textColor("*list description*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!description This is list with my favorite levels. Please enjoy!", Color::LightYellow);
 				}
 				
-				if(Escape::url_base64_decode($list['listDesc']) == $newListDesc) return $list['listName']." already has this description!";
+				if(Escape::url_base64_decode($list['listDesc']) == $newListDesc) return Library::textColor($list['listName'], Color::SkyBlue)." ".Library::textColor("already has", Color::Green)." this description!";
+				
+				if(Library::stringViolatesFilter($newLevelName, 3)) return "New list description contains a ".Library::textColor("bad", Color::Red)." word.";
 				
 				Library::changeListDescription($listID, $person, $newListDesc);
 				
-				return "You successfully changed description of ".$list['listName']." to:".PHP_EOL
-					.$newListDesc;
+				return "You ".Library::textColor("successfully", Color::Green)." changed description of ".Library::textColor($list['listName'], Color::SkyBlue)." to:".PHP_EOL
+					.Library::textColor($newListDesc, Color::Yellow);
 			case '!lockComments':
 			case '!unlockComments':
 			case '!lc':
 			case '!unlc':
-				if(!Library::checkPermission($person, 'commandLockComments') && $person['accountID'] != $list['accountID']) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandLockComments') && $person['accountID'] != $list['accountID']) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 				
 				$lockCommentingArray = [
 					'!lockComments' => 1, '!lc' => 1,
 					'!unlockComments' => 0, '!unlc' => 0
 				];
 				$lockCommenting = $lockCommentingArray[$command];
-				if($list['commentLocked'] == $lockCommenting) return "Comments on ".$list['listName']." are already ".(!$lockCommenting ? 'un' : '')."locked!";
+				if($list['commentLocked'] == $lockCommenting) return "Comments on ".Library::textColor($list['listName'], Color::SkyBlue)." are already ".(!$lockCommenting ? 'un' : '')."locked!";
 				
 				Library::lockCommentingOnList($listID, $person, $lockCommenting);
 				
-				return "You successfully ".(!$lockCommenting ? 'un' : '')."locked comments on ".$list['listName']."!";
+				return "You ".Library::textColor("successfully", Color::Green)." ".(!$lockCommenting ? 'un' : '')."locked comments on ".Library::textColor($list['listName'], Color::SkyBlue)."!";
 			case '!send':
 			case '!suggest':
 			case '!sug':
-				if(!Library::checkPermission($person, 'commandSuggest')) return "You don't have permissions to use command ".$command."!";
+				if(!Library::checkPermission($person, 'commandSuggest')) return "You ".Library::textColor("don't have permissions", Color::Red)." to use command ".Library::textColor($command, Color::SkyBlue)."!";
 			
 				$reward = Escape::number($commentSplit[1]);
 				$difficulty = Escape::latin($commentSplit[2]);
@@ -562,20 +605,20 @@ class Commands {
 				if(empty($levelsCount)) $levelsCount = count(explode(',', $list['listlevels']));
 				
 				if(!is_numeric($reward) || !$difficulty || !is_numeric($featured)) {
-					return "Incorrect usage!".PHP_EOL
-						."!send *reward amount* *difficulty* *is featured* *required levels amount to complete list*".PHP_EOL
-						."Example: !send 50 harder 1 7";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!send ".Library::textColor("*reward amount*", Color::Orange)." ".Library::textColor("*difficulty*", Color::Orange)." ".Library::textColor("*is featured*", Color::Orange)." ".Library::textColor("*required levels amount to complete list*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!send 50 harder 1 7", Color::LightYellow);
 				}
 				
-				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You can't suggest your own list.";
+				if($dontRateYourOwnLevels && $person['accountID'] == $list['accountID']) return "You ".Library::textColor("can't", Color::Red)." suggest your own list.";
 				
 				$sendList = Library::sendList($listID, $person, $reward, $difficulty, $featured, $levelsCount);
-				if(!$sendList) return "You already suggested ".$list['listName']."!";
+				if(!$sendList) return "You ".Library::textColor("already suggested", Color::Green)." ".Library::textColor($list['listName'], Color::SkyBlue)."!";
 				
-				return "You successfully sent ".$list['listName'].' as '.$sendList.', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
+				return "You ".Library::textColor("successfully", Color::Green)." sent ".Library::textColor($list['listName'], Color::SkyBlue).' as '.Library::textColor($sendList, Color::Yellow).', '.$reward .' diamond'.($reward > 1 ? 's!' : '!');
 		}
 		
-		return "Command ".$command." was not found.";
+		return "Command ".Library::textColor($command, Color::SkyBlue)." was ".Library::textColor("not found", Color::Red).".";
 	}
 	
 	public static function processProfileCommand($comment, $account, $person) {
@@ -592,29 +635,29 @@ class Commands {
 		$command = $commentSplit[0];
 		$subCommand = $commentSplit[1];
 		
-		if($command != '!discord') return "Command ".$command." was not found.";
-		if(!$subCommand) return "Please specify subcommand to ".$command.".";
+		if($command != '!discord') return "Command ".Library::textColor($command, Color::SkyBlue)." was ".Library::textColor("not found", Color::Red).".";
+		if(!$subCommand) return "Please specify subcommand to ".Library::textColor($command, Color::SkyBlue).".";
 		
-		if(!$discordEnabled) return "Linking account to Discord is disabled!";
+		if(!$discordEnabled) return "Linking account to Discord ".Library::textColor("is disabled", Color::Red)."!";
 		
 		switch($subCommand) {
 			case 'link':
 			case 'l':
 				$discordID = Escape::number($commentSplit[2]);
 				if(!$discordID) {
-					return "Incorrect usage!".PHP_EOL
-						."!discord link *Discord account ID*".PHP_EOL
-						."Example: !discord link 297295491417505793";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!discord link ".Library::textColor("*Discord account ID*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!discord link 297295491417505793", Color::LightYellow);
 				}
 				
 				$link = Discord::getUserDiscord($accountID);
 				if($link) return "You already linked your account with Discord ID ".$link."!";
 				
 				$discordAccount = Library::getAccountByDiscord($discordID);
-				if($discordAccount) return "Discord ID ".$discordID." is already linked with account ".$discordAccount['userName']."!";
+				if($discordAccount) return "Discord ID ".$discordID." ".Library::textColor("is already", Color::Green)." linked with account ".$discordAccount['userName']."!";
 				
 				$startLinking = Discord::startLinkingAccount($person, $discordID);
-				if(!$startLinking) return "Something went wrong when trying to send code to Discord DMs or Discord ID ".$discordID." doesn't exist.";
+				if(!$startLinking) return "Something went wrong when trying to send code to Discord DMs or Discord ID ".$discordID." ".Library::textColor("doesn't exist", Color::Red).".";
 				
 				return "Verification code and next steps were sent to ".$startLinking." (".$discordID.")!";
 			case 'accept':
@@ -623,27 +666,27 @@ class Commands {
 			case 'v':
 				$code = Escape::number($commentSplit[2]);
 				if(!$code) {
-					return "Incorrect usage!".PHP_EOL
-						."!discord accept *Verification code*".PHP_EOL
-						."Example: !discord accept 7024";
+					return Library::textColor("Incorrect usage!", Color::Red).PHP_EOL
+						."!discord verify ".Library::textColor("*Verification code*", Color::Orange).PHP_EOL
+						."Example: ".Library::textColor("!discord verify 7024", Color::LightYellow);
 				}
 				
 				$link = Discord::getUserDiscord($accountID);
-				if($link) return "You already linked your account with Discord ID ".$link."!";
+				if($link) return "You ".Library::textColor("already linked", Color::Green)." your account with Discord ID ".$link."!";
 				
 				$verifyLinking = Discord::verifyDiscordLinking($person, $code);
-				if(!$verifyLinking) return "You didn't start linking your Discord account or code is wrong.";
+				if(!$verifyLinking) return "You ".Library::textColor("didn't start", Color::Red)." linking your Discord account or code ".Library::textColor("is wrong", Color::Red).".";
 				
-				return "You successfully linked your account to Discord ID ".$verifyLinking."!";
+				return "You ".Library::textColor("successfully", Color::Green)." linked your account to Discord ID ".$verifyLinking."!";
 			case 'unlink':
 			case 'u':
 				$unlink = Discord::unlinkDiscordAccount($person);
-				if(!$unlink) return "Your account doesn't have connection with Discord!";
+				if(!$unlink) return "Your account ".Library::textColor("doesn't have", Color::Red)." connection with Discord!";
 				
-				return "You successfully unlinked your account from Discord!";
+				return "You ".Library::textColor("successfully", Color::Green)." unlinked your account from Discord!";
 		}
 		
-		return "Command ".$command." ".$subCommand." was not found.";
+		return "Command ".Library::textColor($command." ".$subCommand, Color::SkyBlue)." was ".Library::textColor("not found", Color::Red).".";
 	}
 }
 ?>

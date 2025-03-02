@@ -146,7 +146,7 @@ $disallowReuploadingNotUserLevels = false;
 	Turnstile-protected APIs are currently not supported, sorry
 */
 $useCobalt = true;
-$cobaltAPI[] = 'https://cobalt.gcs.icu';
+$cobaltAPI = 'https://cobalt.gcs.icu';
 
 /*
 	Geometry Dash icons renderer Server
@@ -158,4 +158,20 @@ $cobaltAPI[] = 'https://cobalt.gcs.icu';
 	If gdicon.oat.zone doesn't work for you for some reason, you can use icons.gcs.icu
 */
 $iconsRendererServer = 'https://gdicon.oat.zone';
+
+/*
+	Account for level reuploads
+ 
+	You can setup account for level reuploads, reuploaded levels will appear in this account
+
+	$automaticID — should level reupload tool use player's account or one you setup
+		True — levels will be reuploaded on player's account
+		False — levels will be reuploaded on account you setup
+	
+	$reuploadUserID — user ID of account for level reuploads
+	$reuploadAccountID — account ID of account for level reuploads
+*/
+$automaticID = true;
+$reuploadUserID = 0;
+$reuploadAccountID = 0;
 ?>

@@ -22,6 +22,18 @@ $account = Library::getAccountByID($accountID);
 $command = Commands::processProfileCommand($comment, $account, $person);
 if($command) exit(Library::showCommentsBanScreen($command, 0));
 
+$ableToComment = Library::isAbleToAccountComment($person, $comment);
+if(!$ableToComment['success']) {
+	switch($ableToComment['error']) {
+		case CommonError::Banned:
+			exit(Library::showCommentsBanScreen(Escape::translit(Escape::url_base64_decode($ableToComment['info']['reason'])), $ableToComment['info']['expires']));
+		case CommonError::Filter:
+			exit(Library::showCommentsBanScreen("Your post contains a ".Library::textColor("bad", Color::Red)." word.", 0));
+		case CommonError::Automod:
+			exit(Library::showCommentsBanScreen("Posting account comments is currently ".Library::textColor("disabled", Color::Red).".", 0));
+	}
+}
+
 Library::uploadAccountComment($person, $comment);
 exit(CommonError::Success); 
 ?>

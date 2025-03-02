@@ -76,5 +76,84 @@ class IP {
 		*/
 		return $_SERVER['REMOTE_ADDR'];
 	}
+	
+	public static function checkProxy() {
+		require __DIR__."/../../config/security.php";
+		require_once __DIR__."/mainLib.php";
+		
+		if(!isset($blockFreeProxies)) global $blockFreeProxies;
+		if(!isset($proxies)) global $proxies;
+		
+		if(!$blockFreeProxies) return;
+		
+		$fileExists = file_exists(__DIR__ .'/../../config/proxies.txt');
+		$lastUpdate = $fileExists ? filemtime(__DIR__ .'/../../config/proxies.txt') : 0;
+		$checkTime = time() - 3600;
+		$allProxies = '';
+		
+		if($checkTime > $lastUpdate) {
+			foreach($proxies AS $url) {
+				$IPs = Library::sendRequest($url, "", [], "GET", true);
+				$proxy = preg_split('/\r\n|\r|\n/', $IPs);
+				foreach($proxy AS $ip) $allProxies .= explode(':', $ip)[0].PHP_EOL;
+			}
+			file_put_contents(__DIR__ .'/../../config/proxies.txt', $allProxies);
+		}
+		
+		if(empty($allProxies)) $allProxies = file(__DIR__ .'/../../config/proxies.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		else $allProxies = explode(PHP_EOL, $allProxies);
+		
+		if(in_array(self::getIP(), $allProxies)) {
+			http_response_code(404);
+			exit;
+		}
+	}
+	public static function checkVPN() {
+		require __DIR__."/../../config/security.php";
+		require __DIR__."/../../config/proxy.php";
+		
+		if(!isset($blockCommonVPNs)) global $blockCommonVPNs;
+		if(!isset($vpns)) global $vpns;
+		
+		if(!$blockCommonVPNs) return;
+		
+		$fileExists = file_exists(__DIR__ .'/../../config/vpns.txt');
+		$lastUpdate = $fileExists ? filemtime(__DIR__ .'/../../config/vpns.txt') : 0;
+		$checkTime = time() - 3600; 
+		$allVPNs = '';
+		
+		if($checkTime > $lastUpdate) {
+			foreach($vpns AS $url) {
+				$IPs = Library::sendRequest($url, "", [], "GET", true);
+				$allVPNs .= $IPs.PHP_EOL;
+			}
+			file_put_contents(__DIR__ .'/../../config/vpns.txt', $allVPNs);
+		}
+		
+		if(empty($allVPNs)) $allVPNs = file(__DIR__ .'/../../config/vpns.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		else $allVPNs = explode(PHP_EOL, $allVPNs);
+		
+		foreach($allVPNs AS &$vpnCheck) {
+			if($this->ipv4inrange(self::getIP(), $vpnCheck)) {
+				http_response_code(404);
+				exit;
+			}
+		}
+	}
+	public static function checkIP($db) {
+		require_once __DIR__."/mainLib.php";
+		
+		self::checkProxy();
+		self::checkVPN();
+		
+		$banip = $db->prepare("SELECT count(*) FROM bannedips WHERE IP REGEXP :ip");
+		$banip->execute([':ip' => Library::convertIPForSearching(self::getIP(), true)]);
+		$banip = $banip->fetchColumn();
+		
+		if($banip > 0) {
+			http_response_code(404);
+			exit;
+		}
+	}
 }
 ?>

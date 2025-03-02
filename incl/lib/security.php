@@ -130,6 +130,8 @@ class Security {
 		
 		$IP = IP::getIP();
 		
+		if(self::isTooManyAttempts()) return ["success" => false, "error" => LoginError::WrongCredentials, "accountID" => (string)Escape::number($_POST['accountID']), "IP" => $IP];
+		
 		switch(true) {
 			case !empty($_POST['uuid']) && (!empty($_POST['password']) || !empty($_POST['gjp']) || !empty($_POST['gjp2']) || !empty($_POST['auth'])):
 				$userID = Escape::number($_POST['uuid']);
@@ -137,14 +139,24 @@ class Security {
 				break;
 			case empty($_POST['password']) && empty($_POST['gjp']) && empty($_POST['gjp2']) && empty($_POST['auth']) && $unregisteredSubmissions:
 				$udid = isset($_POST['udid']) ? Escape::text($_POST['udid']) : '';
-				$userID = isset($_POST['uuid']) ? Escape::number($_POST['uuid']) : 0;
 				$userName = isset($_POST['userName']) ? Escape::latin($_POST['userName']) : "Undefined";
 				$accountID = isset($_POST['accountID']) ? Escape::number($_POST['accountID']) : 0;
 				
-				if(!$userID && !empty($accountID)) $userID = Library::getUserID($accountID);
+				if(empty($_POST['uuid']) && !empty($accountID)) $userID = Library::getUserID($accountID);
+				else $userID = Escape::number($_POST['uuid']) ?: 0;
 				
 				$verifyUDID = self::verifyUDID($userID, $udid, $userName);
-				if(!$verifyUDID) return ["success" => true, "accountID" => "0", "userID" => "0", "userName" => "Undefined", "IP" => $IP];
+				if(!$verifyUDID) {
+					$logPerson = [
+						'accountID' => 0,
+						'userID' => $userID,
+						'userName' => $userName,
+						'IP' => $IP
+					];
+					
+					if(!empty($udid)) Library::logAction($logPerson, Action::FailedLogin);
+					return ["success" => true, "accountID" => "0", "userID" => "0", "userName" => "Undefined", "IP" => $IP];
+				}
 				
 				return ["success" => true, "accountID" => (!$accountID ? (string)$verifyUDID['unregisteredID'] : $accountID), "userID" => (string)$verifyUDID['userID'], "userName" => (string)$verifyUDID["userName"], "IP" => $IP];
 				break;
@@ -161,7 +173,17 @@ class Security {
 		if(!$loginType) return ["success" => false, "error" => LoginError::GenericError, "accountID" => $accountID];
 
 		$loginToAccount = $this->loginToAccountWithID($accountID, $loginType["key"], $loginType["type"]);
-		if(!$loginToAccount['success']) return ["success" => false, "error" => $loginToAccount['error'], "accountID" => $accountID];
+		if(!$loginToAccount['success']) {
+			$logPerson = [
+				'accountID' => $accountID,
+				'userID' => $userID ?: Library::getUserID($accountID),
+				'userName' => '',
+				'IP' => $IP
+			];
+			
+			Library::logAction($logPerson, Action::FailedLogin);
+			return ["success" => false, "error" => $loginToAccount['error'], "accountID" => $accountID];
+		}
 		return ["success" => true, "accountID" => $loginToAccount['accountID'], "userID" => $loginToAccount['userID'], "userName" => $loginToAccount["userName"], "IP" => $loginToAccount['IP']];
 	}
 	
@@ -287,6 +309,25 @@ class Security {
 		$updateUnregistered->execute([':udids' => $udids, ':userID' => $userID]);
 		
 		return true;
+	}
+	
+	public static function isTooManyAttempts() {
+		require_once __DIR__."/mainLib.php";
+		require_once __DIR__."/ip.php";
+		require_once __DIR__."/enums.php";
+		
+		$IP = IP::getIP();
+		
+		$searchPerson = [
+			'accountID' => 0,
+			'IP' => $IP
+		];
+		
+		$filters = ['type = '.Action::FailedLogin, 'timestamp >= '.time() - 3600];
+		
+		$failedLogins = Library::getPersonActions($searchPerson, $filters);
+		
+		return count($failedLogins) > 4;
 	}
 }
 ?>

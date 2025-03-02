@@ -112,9 +112,9 @@ $leaderboardMinStars = 10;
 	
 	$ratedLevelsUpdates:
 		True — Allow updating rated levels
-		False — Disllow updating rated levels
+		False — Disallow updating rated levels
 		
-	$ratedLevelsUpdatesExceptions - Levels exceptions, works if you set $ratedLevelsUpdates to true
+	$ratedLevelsUpdatesExceptions - Allow these levels to update
 */
 $ratedLevelsUpdates = true;
 $ratedLevelsUpdatesExceptions = [
@@ -125,7 +125,7 @@ $ratedLevelsUpdatesExceptions = [
 /*
 	Multiply comment likes by value
 	
-	This is fun setting, it will allow you to visually multiply comment likes by value you set
+	Fun setting, it will allow you to visually multiply comment likes by value you set
 	
 	$commentAutoLike:
 		True — Enable multiplying

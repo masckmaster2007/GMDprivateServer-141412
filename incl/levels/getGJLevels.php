@@ -20,7 +20,7 @@ $orderEnabled = $isIDSearch = false;
 $filters = ["(unlisted = 0 AND unlisted2 = 0)"];
 
 $str = Escape::text($_POST["str"]) ?: '';
-$gameVersion = Escape::number($_POST["gameVersion"]) ?: 0;
+$gameVersion = Escape::number($_POST["gameVersion"]) ?: 18;
 $binaryVersion = Escape::number($_POST["binaryVersion"]) ?: 0;
 $type = Escape::number($_POST["type"]) ?: 0;
 $diff = Escape::multiple_ids($_POST["diff"]) ?: '-';
@@ -29,10 +29,8 @@ $pageOffset = is_numeric($_POST["page"]) ? Escape::number($_POST["page"]) * 10 :
 
 // Additional search parameters
 
-if(!$showAllLevels) {
-	if($gameVersion == 0) $filters[] = "levels.gameVersion <= 18";
-	else $filters[] = "levels.gameVersion <= '".$gameVersion."'";
-}
+if(!$showAllLevels) $filters[] = "levels.gameVersion <= '".$gameVersion."'";
+
 if(isset($_POST["original"]) && $_POST["original"] == 1) $filters[] = "original = 0";
 if(isset($_POST["coins"]) && $_POST["coins"] == 1) $filters[] = "starCoins = 1 AND NOT levels.coins = 0";
 if((isset($_POST["uncompleted"]) || isset($_POST["onlyCompleted"])) && ($_POST["uncompleted"] == 1 || $_POST["onlyCompleted"] == 1)) {

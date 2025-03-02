@@ -21,7 +21,7 @@ $account = Library::getAccountByID($targetAccountID);
 
 $queryText = Library::getBannedPeopleQuery(0, true);
 
-$user['rank'] = Library::getUserRank($user['stars'], $user['moons']);
+$user['rank'] = Library::getUserRank($user['stars'], $user['moons'], $user['userName']);
 $user['creatorPoints'] = round($user["creatorPoints"], PHP_ROUND_HALF_DOWN);
 
 $user['messagesState'] = $account['mS'];

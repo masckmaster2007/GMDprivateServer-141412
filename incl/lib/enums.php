@@ -49,6 +49,9 @@ class CommonError {
 	
 	const Banned = "-10";
 	const Disabled = "-2";
+	
+	const Filter = "-15";
+	const Automod = "-16";
 }
 
 class LevelUploadError {
@@ -186,5 +189,22 @@ class ModeratorAction {
 	const LevelToggleLDM = 14;
 	const LeaderboardsBan = 15;
 	const ListFeature = 32;
+}
+
+class Color {
+	const Blue = "b";
+	const Green = "g";
+	const LightBlue = "l";
+	const JeansBlue = "j";
+	const Yellow = "y";
+	const Orange = "o";
+	const Red = "r";
+	const Purple = "p";
+	const Violet = "a";
+	const Pink = "d";
+	const LightYellow = "c";
+	const SkyBlue = "f";
+	const Gold = "s";
+	const Undefined = "";
 }
 ?>

@@ -46,16 +46,22 @@ $debugMode = true;
 		1 — checks if clan tag is the word
 		2 — checks if clan tag contains the word
 	$bannedClanTags — list of banned words in clan tags
+	
+	$filterCommon — method of filtering common things (level names, descriptions, comments):
+		0 — disabled
+		1 — checks if common thing is the word
+		2 — checks if common thing contains the word
+	$bannedCommon — list of banned words in common things
 */
 $filterUsernames = 2;
-$bannedClanTags = [ // Add words to ban if it is a username/if it is in a username
+$bannedUsernames = [
 	'RobTop',
 	'nig',
 	'fag'
 ];
 
-$filterClanNames = 2; // 0 = Disabled, 1 = Checks if the clan name is word, 2 = Checks if the clan name contains word
-$bannedClanNames = [ // Add words to ban if it is a clan name/if it is in a clan name
+$filterClanNames = 2;
+$bannedClanNames = [
 	'Support',
 	'Administration',
 	'Moderation',
@@ -63,10 +69,16 @@ $bannedClanNames = [ // Add words to ban if it is a clan name/if it is in a clan
 	'fag'
 ];
 
-$filterClanTags = 2; // 0 = Disabled, 1 = Checks if the clan tag is word, 2 = Checks if the clan tag contains word
-$bannedClanTags = [ // Add words to ban if it is a clan tag/if it is in a clan tag
-	'ADMIN',
+$filterClanTags = 2;
+$bannedClanTags = [
+	'ADM',
 	'MOD',
+	'nig',
+	'fag'
+];
+
+$filterCommon = 2;
+$bannedCommon = [
 	'nig',
 	'fag'
 ];
@@ -100,7 +112,7 @@ $CaptchaSecret = "";
 */
 
 $blockFreeProxies = true; // true = check if person uses free proxy
-$blockCommonVPNs = true; // true = check if person uses a common VPN
+$blockCommonVPNs = false; // true = check if person uses a common VPN
 // URLs for IPs of proxies
 $proxies['http'] = 'https://fhgdps.com/proxies/http.txt';
 $proxies['https'] = 'https://fhgdps.com/proxies/https.txt';
@@ -115,28 +127,28 @@ $vpns['vpn'] = 'https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/v
 
 	$warningsPeriod — period of time in seconds, when new warnings of same type won't show to prevent warn spamming
 
-	$levelsCountModifier — modifier to yesterday levels count to avoid small levels increase warning
-		if(Levels today > Levels yesterday * Levels modifier) WARNING;
+	$levelsCountModifier — modifier to levels before count to avoid small levels increase warning
+		if(Levels after > Levels before * Levels modifier) WARNING;
 	$levelsCheckPeriod — what period of time in seconds to check
 
-	$accountsCountModifier — modifier to yesterday accounts count to avoid small accounts increase warning
-		if(Accounts today > Accounts yesterday * Accounts modifier) WARNING;
+	$accountsCountModifier — modifier to accounts before count to avoid small accounts increase warning
+		if(Accounts after > Accounts before * Accounts modifier) WARNING;
 	$accountsCheckPeriod — what period of time in seconds to check
 
 	$commentsCheckPeriod — comments posted in this period of time in seconds will be checked
 		600 is 10 minutes, so comments posted in last 10 minutes would be checked
 
-	$globalLevelsUploadDelay — if last level was uploaded X seconds ago, new one can't be uploaded.
-	$perUserLevelsUploadDelay — if last level by some user was uploaded X seconds ago, new one can't be uploaded.
+	$globalLevelsUploadDelay — if last level was uploaded X seconds ago, new one can't be uploaded
+	$perUserLevelsUploadDelay — if last level by some user was uploaded X seconds ago, new one can't be uploaded
 */
 
-$warningsPeriod = 86400;
+$warningsPeriod = 302400;
 
 $levelsCountModifier = 1.3;
-$levelsCheckPeriod = 86400;
+$levelsCheckPeriod = 604800;
 
 $accountsCountModifier = 1.3;
-$accountsCheckPeriod = 86400;
+$accountsCheckPeriod = 604800;
 
 $commentsCheckPeriod = 600;
 

@@ -18,6 +18,8 @@ $unlisted = Escape::number($_POST["unlisted"]);
 
 if(count(explode(',', $listLevels)) == 0) exit(CommonError::InvalidRequest);
 
+if(Library::stringViolatesFilter($listName, 3) || Library::stringViolatesFilter($listDesc, 3)) exit(CommonError::InvalidRequest);
+
 $listDetails = [
 	'listName' => $listName,
 	'listDesc' => $listDesc,

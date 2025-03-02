@@ -2,15 +2,13 @@
 require __DIR__."/../../config/misc.php";
 require __DIR__."/../lib/connection.php";
 require_once __DIR__."/../lib/mainLib.php";
-require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/exploitPatch.php";
 require_once __DIR__."/../lib/XOR.php";
 require_once __DIR__."/../lib/cron.php";
+require_once __DIR__."/../lib/ip.php";
 require_once __DIR__."/../lib/enums.php";
-$sec = new Security();
 
-$person = $sec->loginPlayer();
-if(!$person["success"]) exit(CommonError::InvalidRequest);
+$IP = IP::getIP();
 
 $type = !empty($_POST["type"]) ? $_POST["type"] : (!empty($_POST["weekly"]) ? $_POST["weekly"] : 0);
 $current = time();
@@ -42,10 +40,18 @@ if(!$daily) exit(CommonError::InvalidRequest);
 $dailyID = $daily['feaID'] + ($type * 100000);
 $timeLeft = $daily[$dailyTime] - $current;
 
+if(!$oldDailyWeekly && $timeLeft < 0) exit("0|0");
+
 if(!$daily['webhookSent']) {
 	//$gs->sendDailyWebhook($daily['levelID'], $type);
 	$sent = $db->prepare('UPDATE '.$dailyTable.' SET webhookSent = 1 WHERE feaID = :feaID');
 	$sent->execute([':feaID' => $daily['feaID']]);
+	
+	$person = [
+		'accountID' => 0,
+		'userID' => 0,
+		'IP' => $IP
+	];
 	
 	if($automaticCron) Cron::updateCreatorPoints($person, false);
 }
@@ -58,5 +64,5 @@ if($isEvent) {
 	$stringToAdd = '|PGDPS'.$string.'|'.$hash;
 }
 
-exit($dailyID ."|". $timeLeft.$stringToAdd);
+exit($dailyID."|".$timeLeft.$stringToAdd);
 ?>

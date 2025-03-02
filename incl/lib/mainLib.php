@@ -9,12 +9,15 @@ class Library {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/mail.php";
 		require_once __DIR__."/security.php";
+		require_once __DIR__."/automod.php";
 		require_once __DIR__."/ip.php";
 		
 		$IP = IP::getIP();
 		$salt = self::randomString(32);
 		
-		if(strlen($userName) > 20 || is_numeric($userName) || strpos($userName, " ") !== false) return ["success" => false, "error" => RegisterError::InvalidUserName];
+		if(Automod::isAccountsDisabled(0)) return ["success" => false, "error" => CommonError::Automod];
+		
+		if(strlen($userName) > 20 || is_numeric($userName) || strpos($userName, " ") !== false || self::stringViolatesFilter($userName, 0)) return ["success" => false, "error" => RegisterError::InvalidUserName];
 		if(strlen($userName) < 3) return ["success" => false, "error" => RegisterError::UserNameIsTooShort];
 		if(strlen($password) < 6) return ["success" => false, "error" => RegisterError::PasswordIsTooShort];
 		if($password !== $repeatPassword) return ["success" => false, "error" => RegisterError::PasswordsDoNotMatch];
@@ -435,7 +438,7 @@ class Library {
 			}
 		}
 		
-		if($personType == 2) $person = self::IPForBan($person);
+		if($personType == 2) $person = self::convertIPForSearching($person);
 		
 		$check = self::getBan($person, $personType, $banType);
 		if($check) {
@@ -511,7 +514,7 @@ class Library {
 		
 		$accountID = $person['accountID'];
 		$userID = $person['userID'];
-		$IP = self::IPForBan($person['IP']);
+		$IP = self::convertIPForSearching($person['IP']);
 		
 		$ban = $db->prepare('SELECT * FROM bans WHERE ((person = :accountID AND personType = 0) OR (person = :userID AND personType = 1) OR (person = :IP AND personType = 2)) AND banType = :banType AND isActive = 1 ORDER BY expires DESC');
 		$ban->execute([':accountID' => $accountID, ':userID' => $userID, ':IP' => $IP, ':banType' => $banType]);
@@ -520,7 +523,7 @@ class Library {
 		return $ban;
 	}
 	
-	public static function IPForBan($IP, $isSearch = false) {
+	public static function convertIPForSearching($IP, $isSearch = false) {
 		$IP = explode('.', $IP);
 		return $IP[0].'.'.$IP[1].'.'.$IP[2].($isSearch ? '' : '.0');
 	}
@@ -554,7 +557,7 @@ class Library {
 		$roleIDs = [];
 		
 		$getRoleID = $db->prepare("SELECT roleID FROM roleassign WHERE (person = :accountID AND personType = 0) OR (person = :userID AND personType = 1) OR (person REGEXP :IP AND personType = 2)");
-		$getRoleID->execute([':accountID' => $person['accountID'], ':userID' => $person['userID'], ':IP' => self::IPForBan($person['IP'], true)]);
+		$getRoleID->execute([':accountID' => $person['accountID'], ':userID' => $person['userID'], ':IP' => self::convertIPForSearching($person['IP'], true)]);
 		$getRoleID = $getRoleID->fetchAll();
 		
 		foreach($getRoleID AS &$roleID) $roleIDs[] = $roleID['roleID'];
@@ -668,7 +671,7 @@ class Library {
 					$userIDs[] = $ban['person'];
 					break;
 				case 2:
-					$bannedIPs[] = self::IPForBan($ban['person'], true);
+					$bannedIPs[] = self::convertIPForSearching($ban['person'], true);
 					break;
 			}
 		}
@@ -708,6 +711,7 @@ class Library {
 		
 		$accountID = $person["accountID"];
 		$userID = $person["userID"];
+		$userName = $person["userName"];
 		
 		$user = self::getUserByID($userID);
 		$rank = 0;
@@ -716,7 +720,7 @@ class Library {
 			case 'top':
 				$queryText = self::getBannedPeopleQuery(0, true);
 				
-				$leaderboard = $db->prepare("SELECT * FROM users WHERE ".$queryText." stars >= :stars ORDER BY stars + moons DESC, userName ASC LIMIT 100");
+				$leaderboard = $db->prepare("SELECT * FROM users WHERE ".$queryText." stars + moons >= :stars ORDER BY stars + moons DESC, userName ASC LIMIT 100");
 				$leaderboard->execute([':stars' => $leaderboardMinStars]);
 				
 				break;
@@ -762,7 +766,7 @@ class Library {
 					ORDER BY leaderboards.stars + leaderboards.moons DESC, leaderboards.userName ASC");
 				$leaderboard->execute([':stars' => $user['stars'] + $user['moons']]);
 				
-				$rank = max(0, self::getUserRank($user['stars'], $user['moons']) - $count);
+				$rank = max(0, self::getUserRank($user['stars'], $user['moons'], $userName) - $count);
 				
 				break;
 			case 'friends':
@@ -788,13 +792,16 @@ class Library {
 		return ["rank" => $rank, "leaderboard" => $leaderboard];
 	}
 	
-	public static function getUserRank($stars, $moons) {
+	public static function getUserRank($stars, $moons, $userName) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
+		
+		if($stars + $moons < $leaderboardMinStars) return 0;
 		
 		$queryText = self::getBannedPeopleQuery(0, true);
 		
-		$rank = $db->prepare("SELECT count(*) FROM users WHERE ".$queryText." stars + moons >= :stars ORDER BY userName ASC");
-		$rank->execute([':stars' => $stars + $moons]);
+		$rank = $db->prepare("SELECT count(*) FROM users WHERE ".$queryText." stars + moons >= :stars AND IF(stars + moons = :stars, userName <= :userName, 1)");
+		$rank->execute([':stars' => $stars + $moons, ':userName' => $userName]);
 		$rank = $rank->fetchColumn();
 		
 		return $rank;
@@ -843,9 +850,13 @@ class Library {
 	}
 	
 	public static function canSendMessage($person, $toAccountID) {
+		require_once __DIR__."/automod.php";
+		
 		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
 		if(isset($GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID])) return $GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID];
+		
+		if(Automod::isAccountsDisabled(3)) return false;
 		
 		if($person['accountID'] == $toAccountID) {
 			$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = false;
@@ -882,8 +893,6 @@ class Library {
 				}
 				break;
 		}
-				
-		// Automod here
 		
 		$GLOBALS['core_cache']['canSendMessage'][$person['accountID']][$toAccountID] = true;
 		return true;
@@ -1299,9 +1308,10 @@ class Library {
 		return $rawDesc;
 	}
 	
-	public static function isAbleToUploadLevel($person) {
+	public static function isAbleToUploadLevel($person, $levelName, $levelDesc) {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/security.php";
+		require_once __DIR__."/automod.php";
 		
 		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
@@ -1321,10 +1331,15 @@ class Library {
 		$lastUploadedLevelByUser = $lastUploadedLevelByUser->fetchColumn();
 		if($lastUploadedLevelByUser) return ["success" => false, "error" => LevelUploadError::TooFast];
 		
+		if(Library::stringViolatesFilter($levelName, 3) || Library::stringViolatesFilter($levelDesc, 3)) return ["success" => false, "error" => CommonError::Filter];
+		
+		if(Automod::isLevelsDisabled(0)) return ["success" => false, "error" => CommonError::Automod];
+		
 		return ["success" => true];
 	}
 	
 	public function uploadLevel($person, $levelID, $levelName, $levelString, $levelDetails) {
+		require __DIR__."/../../config/misc.php";
 		require __DIR__."/connection.php";
 		
 		if($person['accountID'] == 0 || $person['userID'] == 0) return ['success' => false, 'error' => LoginError::WrongCredentials];
@@ -1333,11 +1348,11 @@ class Library {
 		$userID = $person['userID'];
 		$IP = $person['IP'];
 		
-		$checkLevelExistenceByID = $db->prepare("SELECT updateLocked FROM levels WHERE levelID = :levelID AND userID = :userID AND isDeleted = 0");
+		$checkLevelExistenceByID = $db->prepare("SELECT updateLocked, starStars FROM levels WHERE levelID = :levelID AND userID = :userID AND isDeleted = 0");
 		$checkLevelExistenceByID->execute([':levelID' => $levelID, ':userID' => $userID]);
 		$checkLevelExistenceByID = $checkLevelExistenceByID->fetch();
 		if($checkLevelExistenceByID) {
-			if($checkLevelExistenceByID['updateLocked']) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
+			if($checkLevelExistenceByID['updateLocked'] || (!$ratedLevelsUpdates && $checkLevelExistenceByID['starStars'] > 0 && !in_array($levelID, $ratedLevelsUpdatesExceptions))) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
 			
 			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$levelID, $levelString);
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
@@ -1349,11 +1364,11 @@ class Library {
 			return ["success" => true, "levelID" => (string)$levelID];
 		}
 		
-		$checkLevelExistenceByName = $db->prepare("SELECT levelID, updateLocked FROM levels WHERE levelName LIKE :levelName AND userID = :userID AND isDeleted = 0 ORDER BY levelID DESC LIMIT 1");
+		$checkLevelExistenceByName = $db->prepare("SELECT levelID, updateLocked, starStars FROM levels WHERE levelName LIKE :levelName AND userID = :userID AND isDeleted = 0 ORDER BY levelID DESC LIMIT 1");
 		$checkLevelExistenceByName->execute([':levelName' => $levelName, ':userID' => $userID]);
 		$checkLevelExistenceByName = $checkLevelExistenceByName->fetch();
 		if($checkLevelExistenceByName) {
-			if($checkLevelExistenceByName['updateLocked']) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
+			if($checkLevelExistenceByName['updateLocked'] || (!$ratedLevelsUpdates && $checkLevelExistenceByName['starStars'] > 0 && !in_array($checkLevelExistenceByName['levelID'], $ratedLevelsUpdatesExceptions))) return ['success' => false, 'error' => LevelUploadError::UploadingDisabled];
 			
 			$writeFile = file_put_contents(__DIR__.'/../../data/levels/'.$checkLevelExistenceByName['levelID'], $levelString);
 			if(!$writeFile) return ['success' => false, 'error' => LevelUploadError::FailedToWriteLevel];
@@ -1489,7 +1504,7 @@ class Library {
 	public static function showCommentsBanScreen($text, $time) {
 		$time = $time - time();
 		if($time < 0) $time = 0;
-		return $_POST['gameVersion'] > 20 ? 'temp_'.$time.'_'.$text : '-10';
+		return $_POST['gameVersion'] > 20 ? 'temp_'.$time.'_</c>'.PHP_EOL.' '.$text.'<cc> ' : '-10';
 	}
 	
 	public static function getCommentsOfLevel($levelID, $sortMode, $pageOffset) {
@@ -2040,9 +2055,10 @@ class Library {
 		return true;
 	}
 	
-	public static function isAbleToComment($levelID, $person) {
+	public static function isAbleToComment($levelID, $person, $comment) {
 		require __DIR__."/connection.php";
 		require __DIR__."/../../config/security.php";
+		require_once __DIR__."/automod.php";
 		
 		if($person['accountID'] == 0 || $person['userID'] == 0) return ["success" => false, "error" => LoginError::WrongCredentials];
 		
@@ -2052,7 +2068,26 @@ class Library {
 		$item = $levelID > 0 ? self::getLevelByID($levelID) : self::getListByID($levelID * -1);
 		if($item['commentLocked']) return ["success" => false, "error" => CommonError::Disabled];
 		
-		// Automod here
+		if(self::stringViolatesFilter($comment, 3)) return ["success" => false, "error" => CommonError::Filter];
+		
+		if(Automod::isLevelsDisabled(1)) return ["success" => false, "error" => CommonError::Automod];
+		
+		return ["success" => true];
+	}
+	
+	public static function isAbleToAccountComment($person, $comment) {
+		require __DIR__."/connection.php";
+		require __DIR__."/../../config/security.php";
+		require_once __DIR__."/automod.php";
+		
+		if($person['accountID'] == 0 || $person['userID'] == 0) return ["success" => false, "error" => LoginError::WrongCredentials];
+		
+		$checkBan = self::getPersonBan($person, 3);
+		if($checkBan) return ["success" => false, "error" => CommonError::Banned, "info" => $checkBan];
+		
+		if(self::stringViolatesFilter($comment, 3)) return ["success" => false, "error" => CommonError::Filter];
+		
+		if(Automod::isAccountsDisabled(1)) return ["success" => false, "error" => CommonError::Automod];
 		
 		return ["success" => true];
 	}
@@ -2103,7 +2138,7 @@ class Library {
 		require __DIR__."/connection.php";
 		
 		$checkIfReported = $db->prepare("SELECT count(*) FROM reports WHERE levelID = :levelID AND IP REGEXP :IP");
-		$checkIfReported->execute([':levelID' => $levelID, ':IP' => self::IPForBan($IP, true)]);
+		$checkIfReported->execute([':levelID' => $levelID, ':IP' => self::convertIPForSearching($IP, true)]);
 		$checkIfReported = $checkIfReported->fetchColumn();
 		if($checkIfReported) return false;
 		
@@ -2116,8 +2151,9 @@ class Library {
 	
 	public static function submitLevelScore($levelID, $person, $percent, $attempts, $clicks, $time, $progresses, $coins, $dailyID) {
 		require __DIR__."/connection.php";
+		require_once __DIR__."/automod.php";
 		
-		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
+		if($person['accountID'] == 0 || $person['userID'] == 0 || Automod::isLevelsDisabled(2)) return false;
 		
 		$accountID = $person['accountID'];
 		$condition = $dailyID ? ">" : "=";
@@ -3492,7 +3528,7 @@ class Library {
 		require __DIR__."/connection.php";
 		
 		$accountID = $person['accountID'];
-		$IP = self::IPForBan($person['IP'], true);
+		$IP = self::convertIPForSearching($person['IP'], true);
 		
 		$getActions = $db->prepare("SELECT * FROM actions WHERE (account = :accountID OR IP REGEXP :IP) AND (".implode(") AND (", $filters).") ORDER BY timestamp DESC");
 		$getActions->execute([':accountID' => $accountID, ':IP' => $IP]);
@@ -3528,6 +3564,48 @@ class Library {
 		curl_close($curl);
 		
 		return $result;
+	}
+	
+	public static function stringViolatesFilter($string, $type) {
+		require __DIR__.'/../../config/security.php';
+		require_once __DIR__.'/exploitPatch.php';
+		
+		switch($type) {
+			case 0:
+				$filterStrings = $filterUsernames;
+				$filterBannedWords = $bannedUsernames;
+				break;
+			case 1:
+				$filterStrings = $filterClanNames;
+				$filterBannedWords = $bannedClanNames;
+				break;
+			case 2:
+				$filterStrings = $filterClanTags;
+				$filterBannedWords = $bannedClanTags;
+				break;
+			case 3:
+				$filterStrings = $filterCommon;
+				$filterBannedWords = $bannedCommon;
+				break;
+		}
+		
+		if($filterStrings) {
+			switch($filterStrings) {
+				case 1:
+					if(in_array(strtolower($string), $filterBannedWords)) return true;
+					break;
+				case 2:
+					foreach($filterBannedWords as $bannedWord) {
+						if(!empty($bannedWord) && mb_strpos(Escape::prepare_for_checking($string), Escape::prepare_for_checking($bannedWord)) !== false) return true;
+					}
+			}
+		}
+		
+		return false;
+	}
+	
+	public static function textColor($text, $color) {
+		return '<c'.$color.'>'.$text.'</c>';
 	}
 	
 	/*

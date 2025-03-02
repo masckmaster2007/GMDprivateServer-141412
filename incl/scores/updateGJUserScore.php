@@ -15,6 +15,8 @@ $userID = $person["userID"];
 $userName = $person["userName"];
 $IP = $person["IP"];
 
+if(Automod::isAccountsDisabled(2)) exit($userID);
+
 $stars = Escape::number($_POST["stars"]);
 $demons = Escape::number($_POST["demons"]);
 $icon = Escape::number($_POST["icon"]);

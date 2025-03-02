@@ -48,7 +48,7 @@ $sfxIDs = !empty($_POST["sfxIDs"]) ? Escape::multiple_ids($_POST["sfxIDs"]) : ''
 $ts = !empty($_POST["ts"]) ? Escape::number($_POST["ts"]) : 0;
 $password = !empty($_POST["password"]) ? Escape::number($_POST["password"]) : ($gameVersion > 21 ? 1 : 0);
 
-$isAbleToUploadLevel = Library::isAbleToUploadLevel($person);
+$isAbleToUploadLevel = Library::isAbleToUploadLevel($person, $levelName, $levelDesc);
 if(!$isAbleToUploadLevel['success']) exit(CommonError::InvalidRequest);
 
 $levelDetails = [

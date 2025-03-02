@@ -294,7 +294,7 @@ class Cron {
 		$getIPBans = $getIPBans->fetchAll();
 		$IPBans = [];
 		
-		foreach($getIPBans AS &$ban) $IPBans[] = Library::IPForBan($ban['person'], true);
+		foreach($getIPBans AS &$ban) $IPBans[] = Library::convertIPForSearching($ban['person'], true);
 		
 		$bannedIPsString = implode("|", $IPBans);
 		$unbanIPs = $db->prepare('DELETE FROM bannedips WHERE IP REGEXP "'.$bannedIPsString.'"');

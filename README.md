@@ -1,5 +1,5 @@
 ## GMDprivateServer
-### A server emulator for Geometry Dash.
+### A server emulator for Geometry Dash. Supports GD from 1.0 to 2.207
 
 ## Prerequisites
 
@@ -36,7 +36,12 @@
 
 ## Credits
 
-- Hash functions in incl/lib/security.php: pavlukivan, Italian APK Downloader
+- XOR encryption — https://github.com/sathoro/php-xor-cipher — `incl/lib/XOR.php`
+- Hash functions — pavlukivan, Italian APK Downloader — `incl/lib/security.php`
+- Translit — https://github.com/ashtokalo/php-translit — `config/translit`
+- Discord Webhooks — https://github.com/renzbobz/DiscordWebhook-PHP — `config/webhooks/DiscordWebhook.php`
+- Common VPNs list — https://github.com/X4BNet/lists_vpn — `config/vpns.txt`
+- Contributors — https://github.com/MegaSa1nt/GMDprivateServer/contributors — thank you all!
 
 ## License
 

@@ -33,14 +33,17 @@ if($levelID > 0) {
 	if($command) exit(Library::showCommentsBanScreen($command, 0));
 }
 
-$ableToComment = Library::isAbleToComment($levelID, $person);
+$ableToComment = Library::isAbleToComment($levelID, $person, $comment);
 if(!$ableToComment['success']) {
 	switch($ableToComment['error']) {
 		case CommonError::Banned:
-			if($gameVersion < 21) exit(CommonError::Banned);
 			exit(Library::showCommentsBanScreen(Escape::translit(Escape::url_base64_decode($ableToComment['info']['reason'])), $ableToComment['info']['expires']));
+		case CommonError::Filter:
+			exit(Library::showCommentsBanScreen("Your comment contains a ".Library::textColor("bad", Color::Red)." word.", 0));
+		case CommonError::Automod:
+			exit(Library::showCommentsBanScreen("Commenting is currently ".Library::textColor("disabled", Color::Red).".", 0));
 		default:
-			exit(Library::showCommentsBanScreen("Commenting on this ".($levelID > 0 ? 'level' : 'list')." is currently disabled!", 0));
+			exit(Library::showCommentsBanScreen("Commenting on this ".($levelID > 0 ? 'level' : 'list')." is currently ".Library::textColor("disabled", Color::Red)."!", 0));
 	}
 }
 
