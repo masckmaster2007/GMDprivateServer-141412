@@ -13,6 +13,18 @@ if(empty($db)) {
 	try {
 		$db = new PDO("mysql:host=$servername;port=$port;dbname=$dbname", $username, $password, array(PDO::ATTR_PERSISTENT => true));
 		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+		try {
+			$result = $db->query("SELECT 1 FROM levels LIMIT 1");
+		} catch (Exception $e) {
+			$error = true;
+		}
+		
+		if ($error || $result === FALSE) {
+			$db->exec(file_get_contents(__DIR__ . "/../../database.sql"));
+		}
+
+		
 		$ic->checkIP();
 		$ip = $ic->getYourIP();
 		if($minGameVersion != 0 && isset($_POST['gameVersion']) && $_POST['gameVersion'] != 0 && $_POST['gameVersion'] < $minGameVersion && !isset($_SESSION)) exit("-1");
