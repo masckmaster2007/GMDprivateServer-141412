@@ -237,4 +237,14 @@ $topArtistsFromGD = false;
 	False — moderators can rate their own levels
 */
 $dontRateYourOwnLevels = false;
+
+/*
+	Show creator comment rating
+	
+	Creators can like or dislike comments on their levels, should GDPS core show their rating?
+	
+	True — Show creator comment rating
+	False — Hide creator comment rating
+*/
+$showCreatorRating = true;
 ?>

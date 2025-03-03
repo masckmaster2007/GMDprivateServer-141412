@@ -61,10 +61,12 @@ if(empty($comments['comments'])) exit(CommentsError::NothingFound);
 
 foreach($comments['comments'] AS &$comment) {
 	$extraTextArray = [];
+	$creatorRatingArray = ['1' => 'Liked by creator', '-1' => 'Disliked by creator'];
 	
 	if(!$comment['extID']) $comment['extID'] = Library::getAccountID($comment['userID']);
 	
 	if($comment['userID'] == $comment['creatorUserID'] || $comment['extID'] == $comment['creatorAccountID']) $extraTextArray[] = 'Creator';
+	elseif($comment['creatorRating'] && $showCreatorRating) $extraTextArray[] = $creatorRatingArray[$comment['creatorRating']];
 	
 	$comment['comment'] = Escape::translit(Escape::url_base64_decode($comment["comment"]));
 	$showLevelID = $displayLevelID ? $comment["levelID"] : Library::getFirstMentionedLevel($comment['comment']);
@@ -72,7 +74,6 @@ foreach($comments['comments'] AS &$comment) {
 	
 	$likes = $comment['likes'] - $comment['dislikes'];
 	if($commentAutoLike && isset($specialCommentLikes[$comment["commentID"]])) $likes = $likes * $specialCommentLikes[$comment["commentID"]]; // Multiply by the specified value
-	if($likes < -2) $comment["isSpam"] = 1;
 	
 	$user = Library::getUserByID($comment['userID']);
 	

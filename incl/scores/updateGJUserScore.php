@@ -3,6 +3,7 @@ require_once __DIR__."/../lib/connection.php";
 require_once __DIR__."/../lib/mainLib.php";
 require_once __DIR__."/../lib/security.php";
 require_once __DIR__."/../lib/exploitPatch.php";
+require_once __DIR__."/../lib/automod.php";
 require_once __DIR__."/../lib/enums.php";
 $sec = new Security();
 

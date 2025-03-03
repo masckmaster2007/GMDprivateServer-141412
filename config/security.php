@@ -27,63 +27,6 @@ $preactivateAccounts = true;
 $debugMode = true;
 
 /*
-	Filters for various places
-	
-	$filterUsernames — method of filtering usernames:
-		0 — disabled
-		1 — checks if username is the word
-		2 — checks if username contains the word
-	$bannedUsernames — list of banned words in usernames
-	
-	$filterClanNames — method of filtering clan names:
-		0 — disabled
-		1 — checks if clan name is the word
-		2 — checks if clan name contains the word
-	$bannedClanNames — list of banned words in clan names
-	
-	$filterClanTags — method of filtering clan tags:
-		0 — disabled
-		1 — checks if clan tag is the word
-		2 — checks if clan tag contains the word
-	$bannedClanTags — list of banned words in clan tags
-	
-	$filterCommon — method of filtering common things (level names, descriptions, comments):
-		0 — disabled
-		1 — checks if common thing is the word
-		2 — checks if common thing contains the word
-	$bannedCommon — list of banned words in common things
-*/
-$filterUsernames = 2;
-$bannedUsernames = [
-	'RobTop',
-	'nig',
-	'fag'
-];
-
-$filterClanNames = 2;
-$bannedClanNames = [
-	'Support',
-	'Administration',
-	'Moderation',
-	'nig',
-	'fag'
-];
-
-$filterClanTags = 2;
-$bannedClanTags = [
-	'ADM',
-	'MOD',
-	'nig',
-	'fag'
-];
-
-$filterCommon = 2;
-$bannedCommon = [
-	'nig',
-	'fag'
-];
-
-/*
 	Captcha settings
 	
 	$enableCaptcha — should captcha be enabled:
@@ -124,6 +67,10 @@ $vpns['vpn'] = 'https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/v
 
 /*
 	GDPS automod config
+	
+	
+	-- ANTI-SPAM --
+
 
 	$warningsPeriod — period of time in seconds, when new warnings of same type won't show to prevent warn spamming
 
@@ -139,7 +86,46 @@ $vpns['vpn'] = 'https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/v
 		600 is 10 minutes, so comments posted in last 10 minutes would be checked
 
 	$globalLevelsUploadDelay — if last level was uploaded X seconds ago, new one can't be uploaded
+		0 — turned off
 	$perUserLevelsUploadDelay — if last level by some user was uploaded X seconds ago, new one can't be uploaded
+		0 — turned off
+	$accountsRegisterDelay — if last account was registered X seconds ago, new one can't be registered
+		0 — turned off
+		
+		
+	-- CONTENT FILTERS -- 
+	
+	
+	Filter will disallow content, if it has banned word in it
+	Whitelist will disallow content, if it has banned word, but doesn't have whitelisted word in it
+	
+	$filterUsernames — method of filtering usernames:
+		0 — disabled
+		1 — checks if username is the word
+		2 — checks if username contains the word
+	$bannedUsernames — list of banned words in usernames
+	$whitelistedUsernames — list of whitelisted words in usernames
+	
+	$filterClanNames — method of filtering clan names:
+		0 — disabled
+		1 — checks if clan name is the word
+		2 — checks if clan name contains the word
+	$bannedClanNames — list of banned words in clan names
+	$whitelistedClanNames — list of whitelisted words in clan names
+	
+	$filterClanTags — method of filtering clan tags:
+		0 — disabled
+		1 — checks if clan tag is the word
+		2 — checks if clan tag contains the word
+	$bannedClanTags — list of banned words in clan tags
+	$whitelistedClanTags — list of whitelisted words in clan tags
+	
+	$filterCommon — method of filtering common things (level names, descriptions, comments):
+		0 — disabled
+		1 — checks if common thing is the word
+		2 — checks if common thing contains the word
+	$bannedCommon — list of banned words in common things
+	$whitelistedCommon — list of whitelisted words in common things
 */
 
 $warningsPeriod = 302400;
@@ -154,4 +140,47 @@ $commentsCheckPeriod = 600;
 
 $globalLevelsUploadDelay = 2;
 $perUserLevelsUploadDelay = 5;
+$accountsRegisterDelay = 5;
+
+$filterUsernames = 2;
+$bannedUsernames = [
+	'RobTop',
+	'nig',
+	'fag'
+];
+$whitelistedUsernames = [
+	'night'
+];
+
+$filterClanNames = 2;
+$bannedClanNames = [
+	'Support',
+	'Administration',
+	'Moderation',
+	'nig',
+	'fag'
+];
+$whitelistedClanNames = [
+	'night'
+];
+
+$filterClanTags = 2;
+$bannedClanTags = [
+	'ADM',
+	'MOD',
+	'nig',
+	'fag'
+];
+$whitelistedClanTags = [
+	'night'
+];
+
+$filterCommon = 2;
+$bannedCommon = [
+	'nig',
+	'fag'
+];
+$whitelistedCommon = [
+	'night'
+];
 ?>

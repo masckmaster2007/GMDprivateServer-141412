@@ -61,15 +61,12 @@ $clansTagPosition = '%1$s [%2$s]';
 /*
 	Download links
 	
-	$pc — link to download GDPS for Windows
-	$android — link to download GDPS for Android
-	$mac — link to download GDPS for Mac OS
-	$ios — link to download GDPS for iOS
+	$downloadLinks[] = ['download name', 'download link'];
 */
-$pc = 'download/'.$gdps.'.zip';
-$android = 'download/'.$gdps.'.apk';
-$mac = 'download/'.$gdps.'.dmg';
-$ios = 'download/'.$gdps.'.ipa';
+$downloadLinks[] = ['Windows', 'download/'.$gdps.'.zip'];
+$downloadLinks[] = ['Android', 'download/'.$gdps.'.apk'];
+// $downloadLinks[] = ['Mac OS', 'download/'.$gdps.'.dmg'];
+// $downloadLinks[] = ['iOS', 'download/'.$gdps.'.ipa'];
 
 /*
 	Footer social links

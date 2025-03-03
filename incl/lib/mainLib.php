@@ -17,6 +17,13 @@ class Library {
 		
 		if(Automod::isAccountsDisabled(0)) return ["success" => false, "error" => CommonError::Automod];
 		
+		if($accountsRegisterDelay) {
+			$checkRegister = $db->prepare("SELECT count(*) FROM accounts WHERE registerDate >= :time");
+			$checkRegister->execute([':time' => time() - $accountsRegisterDelay]);
+			$checkRegister = $checkRegister->fetchColumn();
+			if($checkRegister) return ["success" => false, "error" => CommonError::Automod];
+		}
+		
 		if(strlen($userName) > 20 || is_numeric($userName) || strpos($userName, " ") !== false || self::stringViolatesFilter($userName, 0)) return ["success" => false, "error" => RegisterError::InvalidUserName];
 		if(strlen($userName) < 3) return ["success" => false, "error" => RegisterError::UserNameIsTooShort];
 		if(strlen($password) < 6) return ["success" => false, "error" => RegisterError::PasswordIsTooShort];
@@ -1321,15 +1328,18 @@ class Library {
 		$checkBan = self::getPersonBan($person, 2);
 		if($checkBan) return ["success" => false, "error" => CommonError::Banned];
 		
-		$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0');
-		$lastUploadedLevel->execute([':time' => time() - $globalLevelsUploadDelay]);
-		$lastUploadedLevel = $lastUploadedLevel->fetchColumn();
-		if($lastUploadedLevel) return ["success" => false, "error" => LevelUploadError::TooFast];
-		
-		$lastUploadedLevelByUser = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0 AND (userID = :userID OR IP = :IP)');
-		$lastUploadedLevelByUser->execute([':time' => time() - $perUserLevelsUploadDelay, ':userID' => $userID, ':IP' => $IP]);
-		$lastUploadedLevelByUser = $lastUploadedLevelByUser->fetchColumn();
-		if($lastUploadedLevelByUser) return ["success" => false, "error" => LevelUploadError::TooFast];
+		if($globalLevelsUploadDelay) {
+			$lastUploadedLevel = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0');
+			$lastUploadedLevel->execute([':time' => time() - $globalLevelsUploadDelay]);
+			$lastUploadedLevel = $lastUploadedLevel->fetchColumn();
+			if($lastUploadedLevel) return ["success" => false, "error" => LevelUploadError::TooFast];
+		}
+		if($perUserLevelsUploadDelay) {
+			$lastUploadedLevelByUser = $db->prepare('SELECT count(*) FROM levels WHERE uploadDate >= :time AND isDeleted = 0 AND (userID = :userID OR IP = :IP)');
+			$lastUploadedLevelByUser->execute([':time' => time() - $perUserLevelsUploadDelay, ':userID' => $userID, ':IP' => $IP]);
+			$lastUploadedLevelByUser = $lastUploadedLevelByUser->fetchColumn();
+			if($lastUploadedLevelByUser) return ["success" => false, "error" => LevelUploadError::TooFast];
+		}
 		
 		if(Library::stringViolatesFilter($levelName, 3) || Library::stringViolatesFilter($levelDesc, 3)) return ["success" => false, "error" => CommonError::Filter];
 		
@@ -3443,6 +3453,8 @@ class Library {
 		
 		if($person['accountID'] == 0 || $person['userID'] == 0) return false;
 		
+		$extraCommentsColumns = '';
+		
 		$accountID = $person['accountID'];
 		$IP = $person['IP'];
 		
@@ -3450,10 +3462,6 @@ class Library {
 		$checkIfRated->execute([':itemID' => $itemID, ':type' => $type, ':IP' => $IP, ':accountID' => $accountID]);
 		$checkIfRated = $checkIfRated->fetchColumn();
 		if($checkIfRated) return false;
-		
-		$rateItemAction = $db->prepare("INSERT INTO actions_likes (itemID, type, isLike, ip, accountID)
-			VALUES (:itemID, :type, :isLike, INET6_ATON(:IP), :accountID)");
-		$rateItemAction->execute([':itemID' => $itemID, ':type' => $type, ':isLike' => $isLike, ':IP' => $IP, ':accountID' => $accountID]);
 		
 		switch($type) {
 			case 1:
@@ -3463,6 +3471,7 @@ class Library {
 			case 2:
 				$table = "comments";
 				$column = "commentID";
+				$extraCommentsColumns = ', isSpam = IF(likes - dislikes < -1, 1, 0)';
 				break;
 			case 3:
 				$table = "acccomments";
@@ -3475,7 +3484,22 @@ class Library {
 		}
 		$rateColumn = $isLike ? 'likes' : 'dislikes';
 		
-		$rateItem = $db->prepare("UPDATE ".$table." SET ".$rateColumn." = ".$rateColumn." + 1 WHERE ".$column." = :itemID");
+		$item = $db->prepare("SELECT * FROM ".$table." WHERE ".$column." = :itemID");
+		$item->execute([':itemID' => $itemID]);
+		$item = $item->fetch();
+		if(!$item) return false;
+		
+		if($type == 2) {
+			$commentItem = $item['levelID'] > 0 ? self::getLevelByID($item['levelID']) : self::getListByID($item['levelID'] * -1);
+			
+			if($person['userID'] == $commentItem['userID'] || $person['accountID'] == $commentItem['accountID']) $extraCommentsColumns .= ', creatorRating = '.($isLike ? '1' : '-1');
+		}
+		
+		$rateItemAction = $db->prepare("INSERT INTO actions_likes (itemID, type, isLike, ip, accountID)
+			VALUES (:itemID, :type, :isLike, INET6_ATON(:IP), :accountID)");
+		$rateItemAction->execute([':itemID' => $itemID, ':type' => $type, ':isLike' => $isLike, ':IP' => $IP, ':accountID' => $accountID]);
+		
+		$rateItem = $db->prepare("UPDATE ".$table." SET ".$rateColumn." = ".$rateColumn." + 1".$extraCommentsColumns." WHERE ".$column." = :itemID");
 		$rateItem->execute([':itemID' => $itemID]);
 		
 		return true;
@@ -3566,38 +3590,63 @@ class Library {
 		return $result;
 	}
 	
-	public static function stringViolatesFilter($string, $type) {
+	public static function stringViolatesFilter($content, $type) {
 		require __DIR__.'/../../config/security.php';
 		require_once __DIR__.'/exploitPatch.php';
 		
 		switch($type) {
 			case 0:
-				$filterStrings = $filterUsernames;
+				$filterMode = $filterUsernames;
 				$filterBannedWords = $bannedUsernames;
+				$whitelistedWords = $whitelistedUsernames;
 				break;
 			case 1:
-				$filterStrings = $filterClanNames;
+				$filterMode = $filterClanNames;
 				$filterBannedWords = $bannedClanNames;
+				$whitelistedWords = $whitelistedClanNames;
 				break;
 			case 2:
-				$filterStrings = $filterClanTags;
+				$filterMode = $filterClanTags;
 				$filterBannedWords = $bannedClanTags;
+				$whitelistedWords = $whitelistedClanTags;
 				break;
 			case 3:
-				$filterStrings = $filterCommon;
+				$filterMode = $filterCommon;
 				$filterBannedWords = $bannedCommon;
+				$whitelistedWords = $whitelistedCommon;
 				break;
 		}
 		
-		if($filterStrings) {
-			switch($filterStrings) {
+		if($filterMode) {
+			switch($filterMode) {
 				case 1:
-					if(in_array(strtolower($string), $filterBannedWords)) return true;
+					if(in_array(strtolower($content), $filterBannedWords) && !in_array(strtolower($content), $whitelistedWords)) return true;
 					break;
 				case 2:
-					foreach($filterBannedWords as $bannedWord) {
-						if(!empty($bannedWord) && mb_strpos(Escape::prepare_for_checking($string), Escape::prepare_for_checking($bannedWord)) !== false) return true;
+					$contentSplit = explode(' ', $content);
+					
+					// This *may* be not very efficient... I didn't test.
+					foreach($contentSplit AS &$string) {
+						$string = Escape::prepare_for_checking($string);
+						if(empty($string)) continue;
+						
+						foreach($filterBannedWords AS &$bannedWord) {
+							$bannedWord = Escape::prepare_for_checking($bannedWord);
+							if(empty($bannedWord)) continue;
+							
+							if(mb_strpos($string, $bannedWord) !== false) {
+								foreach($whitelistedWords AS &$whitelistedWord) {
+									$whitelistedWord = Escape::prepare_for_checking($whitelistedWord);
+									if(empty($whitelistedWord)) continue;
+									
+									if(mb_strpos($string, $whitelistedWord) !== false) return false;
+								}
+								
+								return true;
+							}
+						}
 					}
+					break;
 			}
 		}
 		
