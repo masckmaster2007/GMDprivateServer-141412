@@ -61,6 +61,11 @@ $songIDs = !empty($_POST["songIDs"]) ? ExploitPatch::numbercolon($_POST["songIDs
 $sfxIDs = !empty($_POST["sfxIDs"]) ? ExploitPatch::numbercolon($_POST["sfxIDs"]) : '';
 $ts = !empty($_POST["ts"]) ? ExploitPatch::number($_POST["ts"]) : 0;
 
+// No more skids :3
+$ch1 = intval($levelVersion);
+$ch2 = intval($requestedStars);
+if($ch1 < 0 || $ch2 < 0 || $ch2 > 10) exit("-1");
+
 if(isset($_POST["password"])) $password = $_POST["password"] != 0 ? ExploitPatch::remove($_POST["password"]) : 1;
 else $password = $gameVersion > 21 ? 1 : 0;
 $id = $gs->getIDFromPost();
