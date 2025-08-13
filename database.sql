@@ -1086,11 +1086,71 @@ ALTER TABLE `users`
   MODIFY `userID` int(11) NOT NULL AUTO_INCREMENT;
 
 INSERT INTO `roleassign` (`assignID`, `roleID`, `accountID`) VALUES (NULL, '1', '1');
-INSERT INTO `roles` (`roleID`, `priority`, `roleName`, `commandRate`, `commandFeature`, `commandEpic`, `commandUnepic`, `commandVerifycoins`, `commandDaily`, `commandWeekly`, `commandEvent`, `commandDelete`, `commandSetacc`, `commandRenameOwn`, `commandRenameAll`, `commandPassOwn`, `commandPassAll`, `commandDescriptionOwn`, `commandDescriptionAll`, `commandPublicOwn`, `commandPublicAll`, `commandUnlistOwn`, `commandUnlistAll`, `commandSharecpOwn`, `commandSharecpAll`, `commandSongOwn`, `commandSongAll`, `commandLockCommentsOwn`, `commandLockCommentsAll`, `commandLockUpdating`, `actionRateDemon`, `actionRateStars`, `actionRateDifficulty`, `actionRequestMod`, `actionSuggestRating`, `actionDeleteComment`, `toolLeaderboardsban`, `dashboardGauntletCreate`, `toolQuestsCreate`, `toolModactions`, `toolSuggestlist`, `dashboardModTools`, `dashboardLevelPackCreate`, `dashboardAddMod`, `dashboardManageSongs`, `dashboardForceChangePassNick`, `dashboardDeleteLeaderboards`, `dashboardManageLevels`, `dashboardManageAutomod`, `dashboardVaultCodesManage`, `demonlistAdd`, `demonlistApprove`, `modipCategory`, `isDefault`, `commentColor`, `modBadgeLevel`) VALUES
-(1, 999, 'Owner', 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, '50,255,255', 2),
-(2, 100, 'Elder Mod', 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '000,000,000', 2),
-(3, 90, 'Mod', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '000,000,000', 1),
-(4, 0, 'Player', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, '000,000,000', 0);
+INSERT INTO `roles` (
+  `roleID`, `priority`, `roleName`,
+  `commandRate`, `commandFeature`, `commandEpic`, `commandUnepic`,
+  `commandVerifycoins`, `commandDaily`, `commandWeekly`, `commandDelete`,
+  `commandSetacc`, `commandRenameOwn`, `commandRenameAll`, `commandPassOwn`, `commandPassAll`,
+  `commandDescriptionOwn`, `commandDescriptionAll`, `commandPublicOwn`, `commandPublicAll`,
+  `commandUnlistOwn`, `commandUnlistAll`, `commandSharecpOwn`, `commandSharecpAll`,
+  `commandSongOwn`, `commandSongAll`, `profilecommandDiscord`,
+  `actionRateDemon`, `actionRateStars`, `actionRateDifficulty`,
+  `actionRequestMod`, `actionSuggestRating`, `actionDeleteComment`,
+  `toolLeaderboardsban`, `toolPackcreate`, `toolQuestsCreate`,
+  `toolModactions`, `toolSuggestlist`, `dashboardModTools`,
+  `modipCategory`, `isDefault`, `commentColor`, `modBadgeLevel`
+) VALUES
+(1, 999, 'Owner',
+  1, 1, 1, 1,
+  1, 1, 1, 1,
+  1, 1, 1, 1, 1,
+  1, 1, 1, 1,
+  1, 1, 1, 1,
+  1, 1, 1,
+  1, 1, 1,
+  1, 1, 1,
+  1, 1, 1,
+  1, 1, 1,
+  1, 0, '50,255,255', 2),
+
+(2, 100, 'Elder Mod',
+  1, 1, 1, 1,
+  1, 1, 1, 1,
+  0, 1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1,
+  0, 1, 1,
+  1, 0, 0,
+  0, 0, 0,
+  0, 0, 0,
+  0, 0, '000,000,000', 2),
+
+(3, 90, 'Mod',
+  0, 0, 0, 0,
+  0, 0, 0, 0,
+  0, 1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1,
+  0, 0, 0,
+  0, 1, 1,
+  0, 0, 0,
+  0, 0, 0,
+  0, 0, '000,000,000', 1),
+
+(4, 0, 'Player',
+  0, 0, 0, 0,
+  0, 0, 0, 0,
+  0, 1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1, 0,
+  1, 0, 1,
+  0, 0, 0,
+  0, 0, 0,
+  0, 0, 0,
+  0, 0, 0,
+  0, 1, '000,000,000', 0);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
