@@ -1,0 +1,1 @@
+<?=exit(header("Location: ./dashboard"));
