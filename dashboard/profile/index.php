@@ -119,6 +119,8 @@ if($accid != $_SESSION["accountID"] && is_numeric($accid)) {
 	</div>'));
 }
 if(!empty($_POST["msg"])) {
+    $userID = $gs->getExtID($_SESSION["accountID"]);
+    if(!$userID) exit();
 	if(Automod::isAccountsDisabled(1)) die($dl->printSong('<div class="form">
 	<h1>'.$dl->getLocalizedString("errorGeneric").'</h1>
        	<form class="form__inner" method="post" action="">
