@@ -16,28 +16,6 @@ if(!$installed) {
 			 `timestamp` int(11) NOT NULL,
 			 PRIMARY KEY (`replyID`)
 			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-	$check = $db->query("SHOW TABLES LIKE 'demonlist'");
-      	$exist = $check->fetchAll();
-      	if(empty($exist)) $db->query("CREATE TABLE `demonlist` (
-		 `levelID` int(11) NOT NULL,
-		 `authorID` int(11) NOT NULL,
-		 `pseudoPoints` int(11) NOT NULL,
-		 `giveablePoints` int(11) NOT NULL,
-		 `youtube` varchar(255) CHARACTER SET utf8mb4 NOT NULL,
-		 PRIMARY KEY (`levelID`)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-	$check = $db->query("SHOW TABLES LIKE 'dlsubmits'");
-      		$exist = $check->fetchAll();
-      		if(empty($exist)) $db->query("CREATE TABLE `dlsubmits` (
-			 `ID` int(11) NOT NULL AUTO_INCREMENT,
-			 `accountID` int(11) NOT NULL,
-			 `levelID` int(11) NOT NULL,
-			 `atts` int(255) NOT NULL,
-			 `ytlink` varchar(255) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
-			 `auth` varchar(255) CHARACTER SET utf8mb4 NOT NULL DEFAULT '',
-			 `approve` int(11) NOT NULL DEFAULT 0,
-			 PRIMARY KEY (`ID`)
-			) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 	$check = $db->query("SHOW TABLES LIKE 'favsongs'");
       		$exist = $check->fetchAll();
       		if(empty($exist)) $db->query("CREATE TABLE `favsongs` (
@@ -151,8 +129,24 @@ if(!$installed) {
 			 `ID` int(11) NOT NULL AUTO_INCREMENT,
 			 `person1` int(11) NOT NULL DEFAULT 0,
 			 `person2` int(11) NOT NULL DEFAULT 0,
+			 `isThread` int(11) NOT NULL DEFAULT 0,
 			 `timestamp` int(11) NOT NULL DEFAULT 0,
 			 PRIMARY KEY (`ID`)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+		$check = $db->query("SHOW TABLES LIKE 'threads'");
+			$exist = $check->fetchAll();
+			if(empty($exist)) $db->query("CREATE TABLE `threads` (
+			 `threadID` int(11) NOT NULL AUTO_INCREMENT,
+			 `threadName` varchar(255) NOT NULL DEFAULT '',
+			 `threadDesc` varchar(2048) NOT NULL DEFAULT '',
+			 `threadIcon` varchar(50) NOT NULL DEFAULT '',
+			 `threadOwner` int(11) NOT NULL DEFAULT 0,
+			 `threadMembers` text NOT NULL DEFAULT '',
+			 `threadInvites` text NOT NULL DEFAULT '',
+			 `isDMThread` int(11) NOT NULL DEFAULT 0,
+			 `lastMessageTimestamp` int(11) NOT NULL DEFAULT 0,
+			 `createTimestamp` int(11) NOT NULL DEFAULT 0,
+			 PRIMARY KEY (`threadID`)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 		$check = $db->query("SHOW COLUMNS FROM `roles` LIKE 'dashboardLevelPackCreate'");
       		$exist = $check->fetchAll();
@@ -344,10 +338,68 @@ if(!$installed) {
 			if(empty($exist)) $db->query("ALTER TABLE `accounts` ADD `custom` varchar(255) NOT NULL DEFAULT '' AFTER `discord`");
 		$check = $db->query("SHOW COLUMNS FROM `accounts` LIKE 'gF'");
 			$exist = $check->fetchAll();
-			if(empty($exist)) $db->query("ALTER TABLE `accounts` ADD `gF` int(1) NOT NULL DEFAULT 0 AFTER `cS`");
+			if(empty($exist)) $db->query("ALTER TABLE `accounts` ADD `gF` int(11) NOT NULL DEFAULT 1 AFTER `cS`");
 		$check = $db->query("SHOW COLUMNS FROM `accounts` LIKE 'gO'");
 			$exist = $check->fetchAll();
-			if(empty($exist)) $db->query("ALTER TABLE `accounts` ADD `gO` int(1) NOT NULL DEFAULT 0 AFTER `gF`");
+			if(empty($exist)) $db->query("ALTER TABLE `accounts` ADD `gO` int(11) NOT NULL DEFAULT 2 AFTER `gF`");
+		$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'isThreadMessage'");
+			$exist = $check->fetchAll();
+			if(empty($exist)) $db->query("ALTER TABLE `messages` ADD `isThreadMessage` int(11) NOT NULL DEFAULT 0 AFTER `readTime`");
+		$check = $db->query("SHOW COLUMNS FROM `messages` LIKE 'isDeleted'");
+			$exist = $check->fetchAll();
+			if(empty($exist)) $db->query("ALTER TABLE `messages` ADD `isDeleted` int(11) NOT NULL DEFAULT 0 AFTER `isThreadMessage`");
+		$check = $db->query("SHOW COLUMNS FROM `friendships` LIKE 'timestamp'");
+			$exist = $check->fetchAll();
+			if(empty($exist)) {
+				$db->query("ALTER TABLE `friendships` ADD `timestamp` int(11) NOT NULL DEFAULT 0 AFTER `isNew2`");
+				
+				$friendshipsArray = [];
+				$friendshipsString = "";
+				
+				$friendshipsActions = $db->prepare("SELECT * FROM actions WHERE type = 28 ORDER BY timestamp DESC");
+				$friendshipsActions->execute();
+				$friendshipsActions = $friendshipsActions->fetchAll();
+				
+				foreach($friendshipsActions AS &$action) {
+					$friendshipsUsers = $action["account"] > $action["value"] ? $action["value"].",".$action["account"] : $action["account"].",".$action["value"];
+					if(isset($friendshipsArray[$friendshipsUsers])) continue;
+					
+					$friendshipsArray[$friendshipsUsers] = true;
+					$friendshipsString .= 'WHEN ((person1 = '.$action["account"].' AND person2 = '.$action["value"].') OR (person1 = '.$action["value"].' AND person2 = '.$action["account"].')) THEN '.$action["timestamp"].PHP_EOL;
+				}
+				
+				$fillTimestamps = $db->prepare("UPDATE friendships SET timestamp = (CASE
+						".$friendshipsString."
+						ELSE 0
+					END)");
+				$fillTimestamps->execute();
+			}
+		$check = $db->query("SHOW COLUMNS FROM `blocks` LIKE 'timestamp'");
+			$exist = $check->fetchAll();
+			if(empty($exist)) {
+				$db->query("ALTER TABLE `blocks` ADD `timestamp` int(11) NOT NULL DEFAULT 0 AFTER `person2`");
+				
+				$blocksArray = [];
+				$blocksString = "";
+				
+				$blocksActions = $db->prepare("SELECT * FROM actions WHERE type = 29 ORDER BY timestamp DESC");
+				$blocksActions->execute();
+				$blocksActions = $blocksActions->fetchAll();
+				
+				foreach($blocksActions AS &$action) {
+					$blocksUsers = $action["account"].",".$action["value"];
+					if(isset($blocksArray[$blocksUsers])) continue;
+					
+					$blocksArray[$blocksUsers] = true;
+					$blocksString .= 'WHEN (person1 = '.$action["account"].' AND person2 = '.$action["value"].') THEN '.$action["timestamp"].PHP_EOL;
+				}
+				
+				$fillTimestamps = $db->prepare("UPDATE blocks SET timestamp = (CASE
+						".$blocksString."
+						ELSE 0
+					END)");
+				$fillTimestamps->execute();
+			}
 	$lines = file($dbPath.'config/dashboard.php');
 	$first_line = $lines[2];
 	$lines = array_slice($lines, 1 + 2);

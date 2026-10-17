@@ -697,8 +697,6 @@ class mainLib {
   			return $_SERVER['HTTP_CF_CONNECTING_IP'];
 		if(isset($_SERVER['HTTP_X_FORWARDED_FOR']) && ipInRange::ipv4_in_range($_SERVER['REMOTE_ADDR'], '127.0.0.0/8')) //LOCALHOST REVERSE PROXY SUPPORT (7m.pl)
 			return $_SERVER['HTTP_X_FORWARDED_FOR'];
-		if(isset($_SERVER['HTTP_X_FORWARDED_FOR']) && $_SERVER['REMOTE_ADDR'] == "10.0.1.10") // 141412 PROXY SUPPORT FUCK YOU HESTIA
-            		return explode(",", $_SERVER['HTTP_X_FORWARDED_FOR'])[0]; // fuck my life
 		return $_SERVER['REMOTE_ADDR'];
 	}
 	public function checkModIPPermission($permission){
@@ -725,8 +723,7 @@ class mainLib {
 
 		require __DIR__ . "/connection.php";
 		$friendsarray = array();
-		$query = "SELECT person1,person2 FROM friendships WHERE person1 = :accountID OR person2 = :accountID"; //selecting friendships
-		$query = $db->prepare($query);
+		$query = $db->prepare("SELECT person1, person2, timestamp FROM friendships WHERE person1 = :accountID OR person2 = :accountID");
 		$query->execute([':accountID' => $accountID]);
 		$result = $query->fetchAll();//getting friends
 		if($query->rowCount() == 0){
@@ -743,6 +740,25 @@ class mainLib {
 			}
 		}
 		return $friendsarray;
+	}
+	public function getFriendships($accountID) { // Friends and timestamp
+		require __DIR__ . "/connection.php";
+		
+		if(!is_numeric($accountID)) return false;
+
+		$friendshipsArray = [];
+		
+		$friendships = $db->prepare("SELECT * FROM friendships WHERE person1 = :accountID OR person2 = :accountID");
+		$friendships->execute([':accountID' => $accountID]);
+		$friendships = $friendships->fetchAll();
+		
+		foreach($friendships AS &$friendship) {
+			$targetAccountID = $friendship["person1"] == $accountID ? $friendship["person2"] : $friendship["person1"];
+			
+			$friendshipsArray[$targetAccountID] = $friendship["timestamp"];
+		}
+		
+		return $friendshipsArray;
 	}
 	public function isFriends($accountID, $targetAccountID) {
 		if(!is_numeric($accountID) || !is_numeric($targetAccountID)) return false;
@@ -2000,6 +2016,49 @@ class mainLib {
 			return true;
 		}
 		return false;
+	}
+	public function syncAccountDMThreads($accountID) {
+		require __DIR__."/connection.php";
+		
+		$dmThreadsArray = $newDMThreadsArray = $dmThreadsMembersArray = $existingThreadsMembersArray = [];
+		
+		$dmThreads = $db->prepare("SELECT * FROM messages, (SELECT min(messageID) messageIDs, (CASE WHEN accID = :accountID THEN toAccountID ELSE accID END) receiverID FROM messages WHERE accID = :accountID OR toAccountID = :accountID GROUP BY receiverID ORDER BY timestamp DESC) messageIDs INNER JOIN users ON users.extID = receiverID WHERE messageID = messageIDs ORDER BY timestamp ASC");
+		$dmThreads->execute([':accountID' => $accountID]);
+		$dmThreads = $dmThreads->fetchAll();
+		
+		foreach($dmThreads AS &$dmThread) {
+			$dmThreadMembers = [$accountID, $dmThread["receiverID"]];
+			sort($dmThreadMembers);
+			$dmThreadMembers = implode(",", $dmThreadMembers);
+			
+			$dmThreadsMembersArray[] = $dmThreadMembers;
+			$dmThreadsArray[$dmThreadMembers] = "('".$dmThreadMembers."', 1, ".$dmThread["timestamp"].", ".time().")";
+		}
+		
+		$existingThreads = $db->prepare("SELECT threadMembers FROM threads WHERE threadMembers IN ('".implode("','", $dmThreadsMembersArray)."') AND isDMThread = 1");
+		$existingThreads->execute();
+		$existingThreads = $existingThreads->fetchAll();
+		
+		foreach($existingThreads AS &$existingThread) $existingThreadsMembersArray[] = $existingThread["threadMembers"];
+		foreach($dmThreadsMembersArray AS &$dmThreadsMember) {
+			if(!in_array($dmThreadsMember, $existingThreadsMembersArray)) $newDMThreadsArray[] = $dmThreadsArray[$dmThreadsMember];
+		}
+		
+		if(!empty($newDMThreadsArray)) {
+			$syncThreads = $db->prepare("INSERT INTO threads (threadMembers, isDMThread, lastMessageTimestamp, createTimestamp) VALUES ".implode(",", $newDMThreadsArray));
+			$syncThreads->execute();
+		}
+		
+		$this->logAction($accountID, 83);
+	}
+	public function getThreadByID($threadID) {
+		require __DIR__."/connection.php";
+		
+		$thread = $db->prepare("SELECT * FROM threads WHERE threadID = :threadID");
+		$thread->execute([":threadID" => $threadID]);
+		$thread = $thread->fetch();
+		
+		return $thread;
 	}
 	public function sendLogsRegisterWebhook($accountID) {
 		require __DIR__."/connection.php";
